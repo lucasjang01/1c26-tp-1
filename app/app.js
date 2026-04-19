@@ -1,96 +1,26 @@
 import express from "express";
+import { init } from "./core/stateManager.js";
+import * as accountController from "./controllers/accountController.js";
+import * as rateController from "./controllers/rateController.js";
+import * as logController from "./controllers/logController.js";
+import * as exchangeController from "./controllers/exchangeController.js";
 
-import {
-  init as exchangeInit,
-  getAccounts,
-  setAccountBalance,
-  getRates,
-  setRate,
-  getLog,
-  exchange,
-} from "./exchange.js";
-
-await exchangeInit();
+await init();
 
 const app = express();
 const port = 3000;
 
 app.use(express.json());
 
-// ACCOUNT endpoints
+app.get("/accounts", accountController.getAll);
+app.put("/accounts/:id/balance", accountController.setBalance);
 
-app.get("/accounts", (req, res) => {
-  res.json(getAccounts());
-});
+app.get("/rates", rateController.getAll);
+app.put("/rates", rateController.setRate);
 
-app.put("/accounts/:id/balance", (req, res) => {
-  const accountId = req.params.id;
-  const { balance } = req.body;
+app.get("/log", logController.getAll);
 
-  if (!accountId || !balance) {
-    return res.status(400).json({ error: "Malformed request" });
-  } else {
-    setAccountBalance(accountId, balance);
-
-    res.json(getAccounts());
-  }
-});
-
-// RATE endpoints
-
-app.get("/rates", (req, res) => {
-  res.json(getRates());
-});
-
-app.put("/rates", (req, res) => {
-  const { baseCurrency, counterCurrency, rate } = req.body;
-
-  if (!baseCurrency || !counterCurrency || !rate) {
-    return res.status(400).json({ error: "Malformed request" });
-  }
-
-  const newRateRequest = { ...req.body };
-  setRate(newRateRequest);
-
-  res.json(getRates());
-});
-
-// LOG endpoint
-
-app.get("/log", (req, res) => {
-  res.json(getLog());
-});
-
-// EXCHANGE endpoint
-
-app.post("/exchange", async (req, res) => {
-  const {
-    baseCurrency,
-    counterCurrency,
-    baseAccountId,
-    counterAccountId,
-    baseAmount,
-  } = req.body;
-
-  if (
-    !baseCurrency ||
-    !counterCurrency ||
-    !baseAccountId ||
-    !counterAccountId ||
-    !baseAmount
-  ) {
-    return res.status(400).json({ error: "Malformed request" });
-  }
-
-  const exchangeRequest = { ...req.body };
-  const exchangeResult = await exchange(exchangeRequest);
-
-  if (exchangeResult.ok) {
-    res.status(200).json(exchangeResult);
-  } else {
-    res.status(500).json(exchangeResult);
-  }
-});
+app.post("/exchange", exchangeController.postExchange);
 
 app.listen(port, () => {
   console.log(`Exchange API listening on port ${port}`);

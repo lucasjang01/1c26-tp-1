@@ -1,1 +1,47 @@
-[]
+[
+  {
+    "id": "gwRQdiWQ5k09rzauKZx-I",
+    "ts": "2026-04-19T15:15:29.090Z",
+    "ok": true,
+    "request": {
+      "baseCurrency": "USD",
+      "counterCurrency": "ARS",
+      "baseAccountId": 2,
+      "counterAccountId": 1,
+      "baseAmount": 100
+    },
+    "exchangeRate": 1400,
+    "counterAmount": 140000,
+    "obs": null
+  },
+  {
+    "id": "sviRYR8BnHEzOp5hXKjsU",
+    "ts": "2026-04-19T15:15:38.877Z",
+    "ok": false,
+    "request": {
+      "baseCurrency": "USD",
+      "counterCurrency": "ARS",
+      "baseAccountId": 2,
+      "counterAccountId": 1,
+      "baseAmount": 9999999
+    },
+    "exchangeRate": 1400,
+    "counterAmount": 0,
+    "obs": "Not enough funds on counter currency account"
+  },
+  {
+    "id": "6JbxcQz7RuJXmXAQxB9YZ",
+    "ts": "2026-04-19T15:15:38.932Z",
+    "ok": false,
+    "request": {
+      "baseCurrency": "USD",
+      "counterCurrency": "ARS",
+      "baseAccountId": 2,
+      "counterAccountId": 1,
+      "baseAmount": 9999999
+    },
+    "exchangeRate": 1400,
+    "counterAmount": 0,
+    "obs": "Not enough funds on counter currency account"
+  }
+]
