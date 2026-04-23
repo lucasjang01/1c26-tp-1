@@ -461,6 +461,148 @@
         "align": false,
         "alignLevel": null
       }
+    },
+    {
+      "title": "Volumen Operado (Monedas)",
+      "type": "graph",
+      "datasource": "Graphite",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "id": 9991,
+      "lines": false,
+      "bars": true,
+      "stack": true,
+      "targets": [
+        {
+          "refId": "A",
+          "target": "aliasByNode(stats.counters.arVault.business.volume.*.count, 4)"
+        }
+      ],
+      "xaxis": {
+        "mode": "time",
+        "show": true
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "show": true,
+          "min": 0
+        },
+        {
+          "format": "short",
+          "show": false
+        }
+      ]
+    },
+    {
+      "title": "Neto Operado (Monedas)",
+      "type": "graph",
+      "datasource": "Graphite",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "id": 9992,
+      "lines": false,
+      "bars": true,
+      "stack": false,
+      "targets": [
+        {
+          "refId": "A",
+          "target": "aliasByNode(stats.counters.arVault.business.net.*.count, 4)"
+        }
+      ],
+      "xaxis": {
+        "mode": "time",
+        "show": true
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "show": true
+        },
+        {
+          "format": "short",
+          "show": false
+        }
+      ]
+    },
+    {
+      "title": "Volumen Operado (Monedas)",
+      "type": "graph",
+      "datasource": "Graphite",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "id": 9991,
+      "lines": false,
+      "bars": true,
+      "stack": true,
+      "targets": [
+        {
+          "refId": "A",
+          "target": "aliasByNode(stats_counts.arVault.business.volume.*, 4)"
+        }
+      ],
+      "xaxis": {
+        "mode": "time",
+        "show": true
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "show": true,
+          "min": 0
+        },
+        {
+          "format": "short",
+          "show": false
+        }
+      ]
+    },
+    {
+      "title": "Neto Operado (Monedas)",
+      "type": "graph",
+      "datasource": "Graphite",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "id": 9992,
+      "lines": false,
+      "bars": true,
+      "stack": false,
+      "targets": [
+        {
+          "refId": "A",
+          "target": "aliasByNode(stats_counts.arVault.business.net.*, 4)"
+        }
+      ],
+      "xaxis": {
+        "mode": "time",
+        "show": true
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "show": true
+        },
+        {
+          "format": "short",
+          "show": false
+        }
+      ]
     }
   ],
   "refresh": "5s",
@@ -567,7 +709,17 @@
       "2h",
       "1d"
     ],
-    "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"]
+    "time_options": [
+      "5m",
+      "15m",
+      "1h",
+      "6h",
+      "12h",
+      "24h",
+      "2d",
+      "7d",
+      "30d"
+    ]
   },
   "timezone": "",
   "title": "Main dashboard",

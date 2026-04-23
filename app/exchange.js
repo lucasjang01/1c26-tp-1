@@ -2,6 +2,11 @@ import { nanoid } from "nanoid";
 
 import { init as stateInit, getAccounts as stateAccounts, getRates as stateRates, getLog as stateLog } from "./state.js";
 
+import StatsD from "statsd-client";
+
+// Initialize StatsD client
+const sdc = new StatsD({ host: 'graphite', port: 8125, prefix: 'arVault' });
+
 let accounts;
 let rates;
 let log;
@@ -90,6 +95,17 @@ export async function exchange(exchangeRequest) {
         counterAccount.balance -= counterAmount;
         exchangeResult.ok = true;
         exchangeResult.counterAmount = counterAmount;
+
+        // Operated Volume (boughts + sells count as volume for both currencies)
+        sdc.counter(`business.volume.${baseCurrency}`, Math.abs(baseAmount));
+        sdc.counter(`business.volume.${counterCurrency}`, Math.abs(counterAmount));
+
+        // Net Operated (purchases add to the system, sales subtract)
+        // Example: If the client delivers ARS (base) in exchange for USD (counter).
+        // arVault (we) add ARS and subtract USD from our reserves.
+        sdc.counter(`business.net.${baseCurrency}`, baseAmount);
+        sdc.counter(`business.net.${counterCurrency}`, -counterAmount);
+
       } else {
         //could not transfer to clients' counter account, return base amount to client
         await transfer(baseAccount.id, clientBaseAccountId, baseAmount);
