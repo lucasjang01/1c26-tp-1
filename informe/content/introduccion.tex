@@ -1,0 +1,15 @@
+\section{Introducción}
+\label{sec:introduccion}
+\subsection{Contexto}
+La startup \textbf{arVault} es una fintech que opera una billetera digital, de reciente creación. Su fundador, un desarrollador aficionado y entusiasta con algo de dinero y muchas ideas, consciente de que la clave de su negocio es la implementación de su \texttt{backend}, tercerizó el desarrollo de las aplicaciones para dispositivos móviles, y se concentró en implementar rápidamente (bajo la consigna \textit{fake it till you make it}\footnote{Expresión popular que refiere a simular confianza o habilidades hasta realmente adquirirlas.}) un núcleo de servicios que le permitieran conseguir más fondos a través de inversores.
+
+Luego de la ronda inicial, los primeros fondos fueron utilizados, no para robustecer la arquitectura existente, sino para agregar más funcionalidad. Una de estas funcionalidades nuevas permite abrir cuentas en distintas monedas (que se respaldan en bancos existentes), y realizar operaciones de cambio entre éstas. El diferencial de \textbf{arVault} es tener la tasa de cambio más conveniente dentro de las aplicaciones que proveen este servicio. Para ganar usuarios, las tasas de cambio no tienen \textit{gap} entre el valor de compra y de venta.
+
+Si bien el lanzamiento fue exitoso, comenzaron a aparecer reclamos de los usuarios sobre problemas en el uso de la función de cambio de monedas. Estos reclamos llegaron en el peor momento, dado que \textbf{arVault} necesita captar más inversiones y, debido a la caída de la reputación y las reviews negativas, los potenciales inversores se niegan a aportar más fondos si no se realiza una auditoría y se mejora el servicio.
+
+Frente a este reclamo, \textbf{arVault} decide contratar a un grupo de arquitectos para que evalúen, propongan e implementen soluciones que mejoren los atributos de calidad del servicio de cambio de monedas.
+
+\subsection{Objetivo}
+
+El objetivo de este informe es presentar una evaluación de la arquitectura actual del servicio de cambio de monedas, identificar los atributos de calidad que se ven afectados (ver Apartado~\ref{sec:atributos-importantes}) por los reclamos de los usuarios, y proponer decisiones de diseño  que puedan mejorar dichos atributos (Apartado~\ref{sec:decisiones-de-diseño}). Además, se presentarán métricas en el Apartado~\ref{sec:metricas} para evaluar el impacto de las decisiones propuestas y se discutirán las conclusiones obtenidas a partir del análisis realizado. Finalmente, se incluirá una sección de conclusiones (Apartado~\ref{sec:conclusion}) que sintetice los hallazgos y recomendaciones para \textbf{arVault}.
+

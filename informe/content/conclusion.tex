@@ -1,0 +1,12 @@
+\section{Conclusión (Parcial)}
+\label{sec:conclusion}
+
+A lo largo del análisis de la arquitectura inicial (\textit{Caso Base}) del \textit{exchange}, se ha constatado que el sistema evidenciaba profundas deficiencias estructurales en sus Atributos de Calidad más críticos, notablemente en relación al eje de \textbf{Confiabilidad}, \textbf{Escalamiento} e \textbf{Integridad Transaccional}. 
+
+Los pasos ejecutados hasta el momento (el refactor a una \textit{Layered Architecture}) han mitigado parcialmente las problemáticas de un bajo acoplamiento: si bien al abstraer \texttt{controllers}, \texttt{services} y \texttt{repositories} la \textbf{Modificabilidad} aumentó, es importante recalcar que el sistema sigue ligado al disco local y a inyecciones asincrónicas en archivos JSON.
+
+Hacia el horizonte del proyecto, es menester la incorporación de un nodo central de persistencia (Base de datos \textit{ACID} o \textit{NoSQL transaccional}), logrando así transicionar los micro-nodos a verdaderos actores \textit{Stateless}. Sólo entonces, será justificable multiplicar dichos procesos detrás de una capa de \textit{proxy inverso} (Nginx), optimizando su \textbf{Escalabilidad Horizontal}.
+
+Por otro lado, se prevé inocular nuevas \textbf{Métricas Biológicas de Dominio (Business Metrics)} (por ejemplo, el volumen de criptomonedas y moneda local transaccionados acumulativamente en el tiempo, identificando valores absolutos y transacciones netas). Esta nueva incorporación de observabilidad ampliará significativamente los índices de éxito sobre \textit{Business Intelligence}, y se proyectan visualizar de forma unificada sobre \textit{Grafana}.
+
+\textit{[NOTA: Una vez implementadas las métricas de dominio (compras/ventas sumadas por divisa e insertadas en Grafana) y reemplazado el archivo JSON por una BD propiamente dicha, no olvidar reescribir esta sección reemplazando el carácter ``Parcial" y unificando el aprendizaje total que se dio al resolver los limitantes anteriores.]}
