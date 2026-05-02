@@ -5,6 +5,23 @@ import * as logRepository from "../repositories/logRepository.js";
 import * as transferService from "./transferService.js";
 import { ValidationError, NotFoundError } from "../utils/errors.js";
 import { hasFields, isPositiveNumber } from "../utils/validators.js";
+import statsd from "../utils/stats.js";
+
+const volumes = {
+  operated: {},
+  net: {}
+};
+
+function updateMetrics(currency, amount, isBuy) {
+  if (!volumes.operated[currency]) volumes.operated[currency] = 0;
+  if (!volumes.net[currency]) volumes.net[currency] = 0;
+
+  volumes.operated[currency] += amount;
+  volumes.net[currency] += isBuy ? amount : -amount;
+
+  statsd.gauge(`exchange.volume.operated.${currency}`, volumes.operated[currency]);
+  statsd.gauge(`exchange.volume.net.${currency}`, volumes.net[currency]);
+}
 
 export async function performExchange(exchangeRequest) {
   const { baseCurrency, counterCurrency, baseAccountId, counterAccountId, baseAmount } =
@@ -63,6 +80,9 @@ export async function performExchange(exchangeRequest) {
 
   result.ok = true;
   result.counterAmount = counterAmount;
+
+  updateMetrics(baseCurrency, baseAmount, true);
+  updateMetrics(counterCurrency, counterAmount, false);
 
   return logRepository.add(result);
 }

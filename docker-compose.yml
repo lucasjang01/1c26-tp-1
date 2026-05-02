@@ -1,6 +1,8 @@
 services:
     api:
       build: ./app
+      environment:
+        - STATSD_HOST=graphite
 
     nginx:
         image: nginx:1.29.8

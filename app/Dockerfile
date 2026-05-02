@@ -1,7 +1,6 @@
 FROM node:22
-RUN mkdir /opt/app
 WORKDIR /opt/app
-COPY * ./
-COPY state ./state
+COPY . .
 RUN npm install
+CMD ["node", "app.js"]
 ENTRYPOINT [ "node", "app.js" ]
