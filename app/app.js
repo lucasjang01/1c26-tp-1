@@ -1,5 +1,5 @@
 import express from "express";
-import { init } from "./core/stateManager.js";
+import { init, getAccounts, getRates } from "./core/stateManager.js";
 import * as accountController from "./controllers/accountController.js";
 import * as rateController from "./controllers/rateController.js";
 import * as logController from "./controllers/logController.js";
@@ -21,6 +21,17 @@ app.put("/rates", rateController.setRate);
 app.get("/log", logController.getAll);
 
 app.post("/exchange", exchangeController.postExchange);
+
+// Ping/Echo (Bass, Availability - Detect Faults)
+app.get("/health", (req, res) => {
+  const accounts = getAccounts();
+  const rates = getRates();
+  const isReady = accounts !== undefined && rates !== undefined;
+  
+  res.status(isReady ? 200 : 503).json({
+    status: isReady ? "ok" : "initializing"
+  });
+});
 
 app.listen(port, () => {
   console.log(`Exchange API listening on port ${port}`);
