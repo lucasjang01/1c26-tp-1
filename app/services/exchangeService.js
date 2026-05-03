@@ -17,13 +17,13 @@ export async function performExchange(exchangeRequest) {
     throw new ValidationError("baseAmount must be a positive number");
   }
 
-  const exchangeRate = rateRepository.getRate(baseCurrency, counterCurrency);
+  const exchangeRate = await rateRepository.getRate(baseCurrency, counterCurrency);
   if (exchangeRate === null) {
     throw new NotFoundError(`No rate found for ${baseCurrency}/${counterCurrency}`);
   }
 
-  const internalBaseAccount = accountRepository.findByCurrency(baseCurrency);
-  const internalCounterAccount = accountRepository.findByCurrency(counterCurrency);
+  const internalBaseAccount = await accountRepository.findByCurrency(baseCurrency);
+  const internalCounterAccount = await accountRepository.findByCurrency(counterCurrency);
   if (!internalBaseAccount || !internalCounterAccount) {
     throw new NotFoundError("Internal account for currency not found");
   }

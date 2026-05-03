@@ -2,7 +2,7 @@ import * as rateRepository from "../repositories/rateRepository.js";
 import { ValidationError } from "../utils/errors.js";
 import { isPositiveNumber } from "../utils/validators.js";
 
-export function getAll() {
+export async function getAll() {
   return rateRepository.getAll();
 }
 

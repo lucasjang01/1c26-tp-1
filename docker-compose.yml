@@ -1,4 +1,9 @@
 services:
+    redis:
+        image: redis:7
+        ports:
+            - "6379:6379"
+
     api:
       build: ./app
       restart: unless-stopped
@@ -8,6 +13,10 @@ services:
         timeout: 5s
         retries: 3
         start_period: 10s
+      environment:
+          - REDIS_HOST=redis
+      depends_on:
+          - redis
 
     nginx:
         image: nginx:1.29.8

@@ -1,8 +1,8 @@
 import * as rateService from "../services/rateService.js";
 import { ValidationError } from "../utils/errors.js";
 
-export function getAll(req, res) {
-  res.json(rateService.getAll());
+export async function getAll(req, res) {
+  res.json(await rateService.getAll());
 }
 
 export async function setRate(req, res) {
@@ -14,7 +14,7 @@ export async function setRate(req, res) {
 
   try {
     await rateService.setRate({ baseCurrency, counterCurrency, rate });
-    res.json(rateService.getAll());
+    res.json(await rateService.getAll());
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
