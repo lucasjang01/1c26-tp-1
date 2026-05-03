@@ -1,6 +1,15 @@
 services:
+    redis:
+        image: redis:7
+        ports:
+            - "6379:6379"
+
     api:
       build: ./app
+      environment:
+          - REDIS_HOST=redis
+      depends_on:
+          - redis
 
     nginx:
         image: nginx:1.29.8
