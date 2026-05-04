@@ -9,18 +9,18 @@ let log = null;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const ACCOUNTS = "../state/accounts.json";
-const RATES = "../state/rates.json";
-const LOG = "../state/log.json";
+const ACCOUNTS = "./state/accounts.json";
+const RATES = "./state/rates.json";
+const LOG = "./state/log.json";
 
 export async function init() {
   accounts = await load(ACCOUNTS);
   rates = await load(RATES);
   log = await load(LOG);
 
-  scheduleSave(() => accounts, ACCOUNTS, 1000);
-  scheduleSave(() => rates, RATES, 5000);
-  scheduleSave(() => log, LOG, 1000);
+  scheduleSave(accounts, ACCOUNTS, 1000);
+  scheduleSave(rates, RATES, 5000);
+  scheduleSave(log, LOG, 1000);
 }
 
 export function getAccounts() {
@@ -35,26 +35,16 @@ export function getLog() {
   return log;
 }
 
-export async function saveAccounts() {
-  await save(accounts, ACCOUNTS);
-}
-
-export async function saveRates() {
-  await save(rates, RATES);
-}
-
-export async function saveLog() {
-  await save(log, LOG);
-}
-
 async function load(fileName) {
   const filePath = path.join(__dirname, fileName);
+
   try {
     await fs.promises.access(filePath);
     const raw = await fs.promises.readFile(filePath, "utf8");
+    
     return JSON.parse(raw);
   } catch (err) {
-    if (err.code === "ENOENT") {
+    if (err.code == "ENOENT") {
       console.error(`${filePath} not found`);
     } else {
       console.error(`Error loading ${filePath}:`, err);
@@ -71,8 +61,8 @@ async function save(data, fileName) {
   }
 }
 
-function scheduleSave(getData, fileName, period) {
+function scheduleSave(data, fileName, period) {
   setInterval(async () => {
-    await save(getData(), fileName);
+    await save(data, fileName);
   }, period);
 }
