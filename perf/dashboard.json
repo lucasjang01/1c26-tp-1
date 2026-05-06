@@ -127,7 +127,8 @@
         "Errors count": "#BF1B00",
         "Pending": "#447EBC",
         "Requests completed": "#7EB26D",
-        "Limited": "#FDDA0D"
+        "Limited": "#FDDA0D",
+        "5xx": "#E02F44"
       },
       "bars": false,
       "dashLength": 10,
@@ -196,6 +197,11 @@
         {
           "refId": "D",
           "target": "alias(stats.gauges.$server.codes.429, 'Limited')"
+        },
+        {
+          "refId": "E",
+          "target": "alias(sumSeries(stats.gauges.$server.codes.5*), '5xx')",
+          "textEditor": true
         }
       ],
       "thresholds": [],
@@ -297,6 +303,14 @@
           "refCount": 0,
           "refId": "C",
           "target": "alias(stats.gauges.$server.scenarioDuration.max, 'Upper')"
+        },
+        {
+          "refId": "D",
+          "target": "alias(stats.gauges.$server.scenarioDuration.p99, 'p99')"
+        },
+        {
+          "refId": "E",
+          "target": "alias(stats.gauges.$server.scenarioDuration.p95, 'p95')"
         },
         {
           "refCount": 0,

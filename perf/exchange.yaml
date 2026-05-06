@@ -1,0 +1,67 @@
+config:
+  environments:
+    baseline:
+      target: 'http://localhost:5555'
+      plugins:
+        statsd:
+          host: localhost
+          port: 8125
+          prefix: "artillery-api"
+      phases:
+        - name: Baseline
+          duration: 180
+          arrivalRate: 1
+
+    load:
+      target: 'http://localhost:5555'
+      plugins:
+        statsd:
+          host: localhost
+          port: 8125
+          prefix: "artillery-api"
+      phases:
+        - name: Ramp
+          duration: 120
+          arrivalRate: 1
+          rampTo: 20
+        - name: Sostenido
+          duration: 300
+          arrivalRate: 20
+
+    stress:
+      target: 'http://localhost:5555'
+      plugins:
+        statsd:
+          host: localhost
+          port: 8125
+          prefix: "artillery-api"
+      phases:
+        - name: "10 rps"
+          duration: 120
+          arrivalRate: 10
+        - name: "25 rps"
+          duration: 120
+          arrivalRate: 25
+        - name: "50 rps"
+          duration: 120
+          arrivalRate: 50
+        - name: "100 rps"
+          duration: 120
+          arrivalRate: 100
+        - name: "200 rps"
+          duration: 120
+          arrivalRate: 200
+
+  pool: 50
+
+scenarios:
+  - name: Exchange ARS->USD
+    flow:
+      - post:
+          url: '/exchange'
+          json:
+            baseCurrency: "ARS"
+            counterCurrency: "USD"
+            baseAccountId: 1
+            counterAccountId: 2
+            baseAmount: 100
