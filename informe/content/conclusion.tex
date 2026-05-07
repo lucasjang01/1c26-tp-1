@@ -16,3 +16,55 @@ Las mejoras implementadas abordaron estos problemas de forma sistemática:
 \end{itemize}
 
 El principal \textit{trade-off} de estas mejoras es sobre la \textbf{Performance}: la introducción de Redis agrega una llamada de red por operación que antes era una lectura en memoria. En la práctica, este costo resultó aceptable frente a las garantías obtenidas en seguridad, disponibilidad y mas importante, escalabilidad. Además se compensa con la mejora de la \textit{Performance} con el agregado de múltiples instancias. Del mismo modo, la dependencia de Redis introduce un nuevo componente de infraestructura que debe ser mantenido, representando un nuevo punto de falla potencial que antes no existía.
+
+\section{Crítica Global}
+
+\subsection{Lo que se hizo bien}
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Stack de observabilidad desacoplado} (StatsD + Graphite + Grafana + cAdvisor): aunque la app no está instrumentada, la infraestructura de métricas está disponible y lista para ser aprovechada.
+    \item \textbf{Containerización completa} con Docker Compose: el entorno completo se levanta con un solo comando, lo que facilita la reproducibilidad entre ambientes de desarrollo.
+    \item \textbf{Separación de responsabilidades} en tres módulos (\texttt{app.js} → \texttt{exchange.js} → \texttt{state.js}): la estructura es coherente y la separación entre routing, lógica de negocio y persistencia es clara para un MVP.
+    \item \textbf{Cálculo automático de la recíproca} en \texttt{PUT /rates}: elimina la posibilidad de ingresar tasas inconsistentes para el par inverso.
+    \item \textbf{Log de transacciones con ID y timestamp}: toda operación queda registrada, lo cual es el punto de partida mínimo para auditoría.
+\end{enumerate}
+
+\subsection{Problemas críticos}
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Race condition TOCTOU} (\texttt{exchange.js:81–105}) \\
+    El chequeo de saldo y su descuento están separados por 400–800 ms de awaits. Bajo cualquier carga concurrente real, dos requests simultáneos pueden pasar el check con el mismo saldo, produciendo saldo negativo. \textbf{Este es el origen directo de los reclamos de usuarios}. Es un defecto estructural, no un caso borde.
+    \item \textbf{Persistencia no atómica y sin garantías de durabilidad} (\texttt{state.js}) \\
+    Ventana de pérdida de datos de hasta 5 segundos; escrituras no atómicas pueden corromper el JSON; imposibilidad de escalar horizontalmente.
+    \item \textbf{Sin autenticación propia} (README + \texttt{docker-compose.yml}) \\
+    El servicio está completamente expuesto. Cualquier actor con acceso de red puede manipular saldos y tasas de cambio.
+    \item \textbf{Sin instrumentación de la aplicación} \\
+    El sistema no sabe qué está pasando dentro de sí mismo. Los reclamos de usuarios se deben a comportamientos que el equipo no puede observar ni correlacionar con métricas.
+\end{enumerate}
+
+\subsection{Problemas importantes}
+
+\begin{enumerate}[leftmargin=*]
+    \item \texttt{transfer()} siempre exitosa (\texttt{exchange.js:114–120}): el flujo de rollback nunca fue testeado; la latencia artificial de 400–800 ms degrada el rendimiento sin beneficio.
+    \item HTTP 500 para errores de negocio (\texttt{app.js:91}): hace el monitoring inútil y genera UX confusa en las apps mobile.
+    \item Log ilimitado (\texttt{exchange.js:108}): memory leak estructural con degradación progresiva de performance.
+    \item Validación superficial (\texttt{app.js}): acepta montos negativos, crashea con pares de monedas inválidos.
+    \item Nginx upstream hardcodeado (\texttt{nginx\_reverse\_proxy.conf}): bloquea el escalado horizontal y crea fragilidad de portabilidad.
+\end{enumerate}
+
+\subsection{Deuda técnica reconocida por el desarrollador}
+
+El README documenta explícitamente las limitaciones conocidas:
+\begin{itemize}
+    \item ``No me gusta guardar todo en archivos .json, por ahora va, pero tendría que hacer algo distinto.''
+    \item ``No valida casi nada, solo que los parámetros de los JSON tengan algún valor.''
+    \item ``Ver el tema del manejo de las cuentas, debería ser responsabilidad de otro servicio.''
+    \item ``TODO: replicar vaultSec!!!''
+\end{itemize}
+La situación no es de falta de consciencia sobre los problemas, sino de decisiones de priorización que pusieron el time-to-market por encima de la corrección del sistema. El costo de esa decisión se materializó en los reclamos de usuarios: la race condition TOCTOU en \texttt{exchange()} es un defecto determinístico que se activa bajo carga concurrente normal, la condición de operación esperada en producción.
+
+\subsection{Diagnóstico final}
+
+El servicio funciona correctamente bajo un único usuario a la vez. Falla de forma determinística bajo concurrencia. Para una fintech cuyo producto principal es el cambio de divisas, la concurrencia es la condición normal de operación, no un caso excepcional.
+
+La arquitectura no requiere un reemplazo total: el problema raíz es la ausencia de atomicidad en la operación de exchange. Un mecanismo de locking en memoria (correctivo inmediato) o una base de datos con soporte transaccional (solución definitiva) resuelven el QA de confiabilidad. Los demás problemas —visibilidad, seguridad, testabilidad, portabilidad— son mejoras incrementales que pueden abordarse en iteraciones posteriores, una vez garantizada la correctitud del núcleo del negocio.

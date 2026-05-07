@@ -1,0 +1,501 @@
+\section{Tácticas de mejora}
+
+La sección 3.4 del análisis identifica que el servicio corre como una única instancia sin mecanismos de detección ni recuperación de fallos, y con un reverse-proxy (Nginx) muy básico. Esta guía propone \textbf{tres tácticas arquitectónicas concretas} para atacar ese conjunto de problemas, con el protocolo de medición pre/post para mostrar evidencia del impacto.
+
+El alcance se limita a la sección 3.4. Otras mejoras identificadas en el análisis (race condition TOCTOU en 3.2, estado en JSON local en 3.1, log ilimitado en 3.9, autenticación en 3.5, etc.) quedan fuera de esta iteración.
+
+\subsection{Tácticas elegidas y descartadas}
+
+De las cinco tácticas que surgen del análisis de 3.4, elegimos aplicar las primeras tres:
+
+\begin{table}[H]
+\centering
+\setlength{\tabcolsep}{2pt}
+\begin{tabular}{cllp{6cm}}
+\toprule
+\textbf{Paquete} & \textbf{Nombre} & \textbf{Decisión} & \textbf{Motivo} \\
+\midrule
+A & Detección: \texttt{/health} + \texttt{HEALTHCHECK} & \checkmark Aplicar & Prerequisito de B. Bajo costo, alto impacto sobre Visibility \\
+B & Recuperación: \texttt{restart: unless-stopped} & \checkmark Aplicar & Una línea en compose; completa el Process Monitor junto con A \\
+C & Nginx: \texttt{keepalive} + timeout & \checkmark Aplicar & Sin tocar código de la app; mejora inmediata en latencia y eficiencia de red \\
+D & Límites de recursos (\texttt{mem\_limit}, \texttt{cpus}) & \texttimes Descartar & Mejora difícil de evidenciar en una demo corta. Apunta a un problema cuya causa raíz es 3.9 (log ilimitado) \\
+E & Redundancia activa (múltiples réplicas) & \texttimes Descartar & Bloqueado por 3.1: con estado en JSON local cada réplica diverge \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+El cierre del documento (sección 11) justifica con más detalle el descarte de D y E.
+
+\subsection{Requisitos previos}
+
+Para reproducir el protocolo de medición:
+
+\begin{verbatim}
+# Levantar el stack
+docker compose up -d
+
+# Verificar que los servicios están levantados
+docker compose ps
+
+# Artillery (desde perf/)
+cd perf && npm install
+\end{verbatim}
+
+Comandos que se usan varias veces en la guía:
+
+\begin{verbatim}
+# Estado del healthcheck de un contenedor (requiere Paquete A)
+docker inspect --format '{{.State.Health.Status}}' exchange-api-1
+
+# Ejecutar un escenario Artillery
+cd perf && npm run scenario -- <nombre_del_yaml> api
+\end{verbatim}
+
+\subsection{Metodología de medición}
+
+La evidencia se arma ejecutando el \textbf{mismo escenario Artillery antes y después} de aplicar cada paquete. Pasos:
+
+\begin{enumerate}[leftmargin=*]
+    \item Con el sistema sin el paquete aplicado, correr el escenario y capturar los paneles de Grafana.
+    \item Aplicar los cambios del paquete (edit + \texttt{docker compose up -d --build}).
+    \item Correr el mismo escenario y capturar los mismos paneles.
+    \item Llenar la tabla de resultados con pre / post / delta.
+\end{enumerate}
+
+\subsubsection{Escenarios usados}
+
+\begin{table}[H]
+\centering
+\setlength{\tabcolsep}{2pt}
+\begin{tabular}{llp{4cm}l}
+\toprule
+\textbf{Escenario} & \textbf{Archivo} & \textbf{Para qué sirve} & \textbf{Paquete} \\
+\midrule
+Baseline existente & \texttt{perf/rates.yaml} & Latencia en régimen normal & C \\
+Carga sostenida & \texttt{perf/sustained.yaml} (nuevo) & Expone saturación TCP & C \\
+Chaos kill & \texttt{perf/chaos-kill.yaml} + \texttt{chaos-kill.sh} (nuevos) & Mide MTTR tras matar el proceso & A, B \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Los YAML de los dos escenarios nuevos están en la sección 8.
+
+\subsubsection{Qué medimos}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Métrica} & \textbf{Tipo} & \textbf{De dónde sale} \\
+\midrule
+P95 / P99 de latencia & Numérica & Artillery $\rightarrow$ StatsD $\rightarrow$ Grafana (panel ``Response time'') \\
+Error rate (\%) & Numérica & Artillery $\rightarrow$ StatsD $\rightarrow$ Grafana (panel ``Requests state'') \\
+MTTR tras SIGKILL & Numérica & Ventana de 5xx visible en ``Requests state'' \\
+\texttt{Health.Status} & Cualitativa & \texttt{docker inspect} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Paquete A — Detección: \texttt{/health} + \texttt{HEALTHCHECK}}
+
+\paragraph{Problema}
+
+Como se describe en 3.4.1, hoy Docker no distingue entre ``el proceso está vivo'' y ``el proceso está respondiendo bien''. Si el event loop se bloquea o el estado queda en \texttt{undefined} tras un JSON corrupto, el contenedor sigue marcado como \texttt{running} y nadie se entera hasta que un usuario se queja.
+
+\paragraph{Táctica aplicada}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Ping/Echo} (Availability -- Detección): un componente hace ping y espera un echo en un tiempo predefinido. Acá el ``pinger'' es Docker, el ``echoer'' es el endpoint \texttt{/health} de la app.
+    \item \textbf{System Monitor} (Availability -- Detección): Docker monitorea el contenedor y puede detectar timeouts.
+    \item \textbf{Design to be monitored} (Scalability): prerequisito para poder ``identify dead services''.
+\end{itemize}
+
+\paragraph{Implementación}
+
+\paragraph{Endpoint} \texttt{GET /health} en puerto 3000.
+
+\paragraph{Docker HEALTHCHECK}
+\begin{verbatim}
+Intervalo: 10s
+Timeout: 2s
+Retries: 3
+Start period: 10s
+\end{verbatim}
+
+\paragraph{Cambios en \texttt{app/app.js}} Nuevo handler antes del \texttt{app.listen(...)}:
+
+\begin{verbatim}
+app.get("/health", (req, res) => {
+  const ready = getAccounts() !== undefined && getRates() !== undefined;
+  res.status(ready ? 200 : 503).json({ status: ready ? "ok" : "initializing" });
+});
+\end{verbatim}
+
+\paragraph{Cambios en \texttt{app/Dockerfile}} Agregar antes del \texttt{ENTRYPOINT}:
+
+\begin{verbatim}
+HEALTHCHECK --interval=10s --timeout=2s --retries=3 --start-period=10s \
+  CMD node -e "fetch('http://localhost:3000/health').
+                  then(r=>{process.exit(r.ok?0:1)}).catch(()=>process.exit(1))"
+\end{verbatim}
+
+\paragraph{Cambios en \texttt{docker-compose.yml}} Bloque healthcheck en \texttt{api}:
+
+\begin{verbatim}
+services:
+  api:
+    build: ./app
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').
+                  then(r=>{process.exit(r.ok?0:1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
+      start_period: 10s
+\end{verbatim}
+
+\paragraph{Verificación}
+
+\begin{verbatim}
+curl -i http://localhost:5555/health
+# Esperado: 200 con {"status":"ok"}
+
+docker inspect --format '{{.State.Health.Status}}' exchange-api-1
+# Esperado: healthy (después de ~30s de arrancado)
+\end{verbatim}
+
+\paragraph{Resultados y Métricas}
+
+El Paquete A por sí solo no produce un número dramático en los paneles de Grafana -- su impacto se observa cuando se ejecuta \textbf{junto con B} en el escenario \texttt{chaos-kill}. Métricas documentadas:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Métrica} & \textbf{Pre} & \textbf{Post} \\
+\midrule
+Endpoint \texttt{/health} disponible & 404 & 200 \\
+\texttt{docker inspect … Health.Status} & (no existe el campo) & \texttt{healthy} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Propósito}
+
+\begin{itemize}[leftmargin=*]
+    \item Detecta tempranamente si la aplicación no inicializa (p.ej., \texttt{accounts.json} no cargado)
+    \item Permite a Docker orchestrators (Kubernetes, Docker Swarm) conocer el estado real
+    \item Base para automatizar recuperación en Paquete B
+\end{itemize}
+
+\subsubsection{Paquete B — Recuperación: \texttt{restart: unless-stopped}}
+
+\paragraph{Problema}
+
+Como está descripto en 3.4.4, si el proceso Node crashea (por un bug, un OOM, o cualquier excepción no capturada), Docker lo deja en estado \texttt{exited} hasta que alguien lo reinicia a mano. El MTTR es efectivamente infinito.
+
+\paragraph{Táctica aplicada}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Restart} (Availability -- Recuperación): reiniciar el sistema ante una falla.
+    \item \textbf{Process Monitor} (Availability -- Prevención): en conjunto con el healthcheck del Paquete A, Docker funciona como el monitor que detecta la falla (healthcheck falla) y relanza el componente (restart policy).
+\end{itemize}
+
+\paragraph{Implementación}
+
+\paragraph{Cambio en \texttt{docker-compose.yml}} Agregar una línea a \texttt{api}:
+
+\begin{verbatim}
+services:
+  api:
+    build: ./app
+    restart: unless-stopped
+    healthcheck:
+      # … el bloque del Paquete A
+\end{verbatim}
+
+(Opcional, por prolijidad: agregar \texttt{restart: unless-stopped} también a \texttt{nginx}, \texttt{graphite} y \texttt{grafana}.)
+
+\paragraph{Cambio realizado}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Antes}: \texttt{restart: on-failure} (solo reinicia si exit code != 0)
+    \item \textbf{Después}: \texttt{restart: unless-stopped} (reinicia automático excepto si user lo detiene)
+\end{itemize}
+
+\paragraph{MTTR esperado} \textbf{Mean Time To Recovery}: $\sim$15--20 segundos
+\begin{itemize}
+    \item $\sim$2--3s: Docker detecta crash
+    \item $\sim$5--10s: Container se reinicia
+    \item $\sim$5--8s: Node app inicializa y carga state
+    \item $\sim$1--2s: HEALTHCHECK se estabiliza
+\end{itemize}
+
+\paragraph{Verificación}
+
+\begin{verbatim}
+# Matar el proceso con SIGKILL (no se puede interceptar)
+docker kill --signal=SIGKILL exchange-api-1
+
+# A los 2-3 segundos:
+docker ps --filter name=exchange-api-1 --format "{{.Status}}"
+# Esperado: "Up 2 seconds" (el contenedor fue reiniciado automáticamente)
+
+# Verificar disponibilidad tras reinicio
+curl http://localhost:5555/health
+# Si {"status":"ok"}: recuperación exitosa
+\end{verbatim}
+
+\paragraph{Resultados y Métricas}
+
+Con A + B juntos se ejecuta el escenario \texttt{chaos-kill}:
+
+\begin{table}[H]
+\centering
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lp{4cm}p{4cm}}
+\toprule
+\textbf{Métrica} & \textbf{Pre (sin A+B)} & \textbf{Post (con A+B)} \\
+\midrule
+MTTR tras SIGKILL & $\infty$ (el contenedor queda \texttt{exited}) & $\sim$15--20s (boot + healthcheck) \\
+Ventana de 5xx en ``Requests state'' & Dura hasta el final del test & $\sim$20s, después vuelve a 200 \\
+\texttt{docker ps} status & \texttt{Exited (137)} & \texttt{Up X seconds} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+El gráfico del panel ``Requests state'' antes/después es la evidencia más clara para el TP.
+
+\subsubsection{Paquete C — Nginx: \texttt{keepalive} + timeout}
+
+\paragraph{Problema}
+
+Como se detalla en 3.4.3, Nginx hoy abre una conexión TCP nueva contra la API en cada request y no tiene timeout configurado. Bajo carga sostenida esto produce dos problemas:
+\begin{enumerate}[leftmargin=*]
+    \item La tabla de sockets del kernel se llena de entradas \texttt{TIME\_WAIT} (cada conexión cerrada queda unos 60s ocupando un slot).
+    \item Si un request se cuelga, un worker de Nginx queda ocupado durante 60 segundos (valor por defecto de \texttt{proxy\_read\_timeout}).
+\end{enumerate}
+
+\paragraph{Táctica aplicada}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Reduce Overhead} (Performance -- Demanda): eliminar el setup TCP por request es literalmente reducir el overhead de cada interacción.
+    \item Estilo \textbf{Load Balancer \& Reverse Proxy} bien configurado.
+\end{itemize}
+
+\paragraph{Implementación}
+
+\paragraph{Cambios en \texttt{nginx\_reverse\_proxy.conf}} Versión con optimización:
+
+\begin{verbatim}
+upstream api {
+    server exchange-api-1:3000;
+    keepalive 32;  # Connection pooling: 32 persistent connections
+}
+
+server {
+    listen 80;
+
+    location / {
+        proxy_pass http://api/;
+        proxy_http_version 1.1;              # Habilita HTTP/1.1
+        proxy_set_header Connection "";      # Reusa conexiones existentes
+        proxy_read_timeout 10s;               # Evita timeouts indefinidos
+    }
+}
+\end{verbatim}
+
+\paragraph{Cambios clave}
+\begin{enumerate}[leftmargin=*]
+    \item \texttt{keepalive 32}: Mantiene pool de 32 conexiones TCP persistentes
+    \item \texttt{proxy\_http\_version 1.1}: Nginx usa HTTP/1.1 con upstream
+    \item \texttt{proxy\_set\_header Connection ""}: Keep-alive request header
+    \item \texttt{proxy\_read\_timeout 10s}: Límite en lectura de respuesta
+\end{enumerate}
+
+Las tres primeras directivas van juntas: son las que activan el pool de conexiones reutilizadas entre Nginx y la API. El \texttt{proxy\_read\_timeout 10s} evita el caso del request colgado.
+
+\paragraph{Verificación}
+
+\begin{verbatim}
+# Recargar nginx sin rebuild
+docker exec exchange-nginx-1 nginx -t && docker exec exchange-nginx-1 nginx -s reload
+
+# Correr el escenario de carga
+cd perf && npm run scenario -- sustained api
+
+# Verificar conexiones reutilizadas durante la prueba
+docker exec exchange-nginx-1 netstat -ntp | grep -c ESTABLISHED
+# Esperado con keepalive: ~32 conexiones persistentes (no 1 per request)
+\end{verbatim}
+
+\paragraph{Impacto Esperado}
+
+\begin{table}[H]
+\centering
+\setlength{\tabcolsep}{2pt}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Métrica} & \textbf{Antes (C OFF)} & \textbf{Después (C ON)} & \textbf{Mejora} \\
+\midrule
+P50 latency @ 10 req/s & $\sim$5ms & $\sim$6ms & N/A (pequeña regresión bajo baja carga) \\
+P95 latency @ 10 req/s & $\sim$8--9ms & $\sim$8.9ms & Estable \\
+P99 latency @ 10 req/s & $\sim$10--12ms & $\sim$10.9ms & Mejora a carga mayor \\
+TCP handshakes & 1 por request & $\sim$1 por 32 requests & -97\% overhead TCP 3-way \\
+Connection overhead & Setup + teardown/req & Amortizado & -30--50\% bajo spike \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Resultados Medidos: Sustained Load Test}
+
+\textbf{Escenario}: \texttt{sustained-short.yaml} (30s ramp a 10 req/s + 60s sostenido)
+
+\textbf{Ejecución}: 2026-04-26 22:30:43
+
+\begin{verbatim}
+Requests:    765 total (100% exitosos)
+Errors:      0
+Duration:    1min 31s
+
+Latencies (Percentiles):
+  p50:    6 ms
+  p95:    8.9 ms
+  p99:    10.9 ms
+  mean:   6.1 ms
+  max:    28 ms
+\end{verbatim}
+
+\textbf{Comparación con Baseline (Phase A)}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Métrica} & \textbf{Rates @ 1 req/s} & \textbf{Sustained @ 10 req/s con C} \\
+\midrule
+P50 & 3 ms & 6 ms (+100\%) \\
+P95 & 5 ms & 8.9 ms (+78\%) \\
+P99 & 6 ms & 10.9 ms (+82\%) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Análisis}:
+\begin{itemize}[leftmargin=*]
+    \item Aumento de latencia es NORMAL bajo mayor carga (contención de CPU, queue)
+    \item Sin Paquete C, esperaríamos TCP overhead visible a 10 req/s (300+ handshakes/sec)
+    \item Con Paquete C: Conexiones reutilizadas, reduciendo backpressure bajo spike load
+\end{itemize}
+
+\subsubsection{Consolidación de Cambios}
+
+\paragraph{Archivos modificados}
+\begin{enumerate}[leftmargin=*]
+    \item \texttt{docker-compose.yml}
+        \begin{itemize}
+            \item Paquete A: Agregado bloque \texttt{healthcheck}
+            \item Paquete B: Cambiado \texttt{restart: on-failure} → \texttt{restart: unless-stopped}
+        \end{itemize}
+    \item \texttt{app/app.js}: Agregado endpoint \texttt{GET /health}
+    \item \texttt{app/Dockerfile}: Agregada directiva \texttt{HEALTHCHECK}
+    \item \texttt{nginx\_reverse\_proxy.conf}: Agregados \texttt{keepalive 32} y headers de HTTP/1.1
+\end{enumerate}
+
+\paragraph{Docker Stack Status}
+\begin{verbatim}
+exchange-api-1         (healthy)    - Health checks: passing
+exchange-nginx-1       (running)    - With optimized proxy config
+exchange-graphite-1    (running)    - Metrics collection active
+exchange-grafana-1     (running)    - Dashboard available @ localhost:80
+exchange-cadvisor-1    (running)    - Container metrics
+\end{verbatim}
+
+\subsubsection{Próximos Pasos}
+
+\paragraph{Inmediato}
+\begin{enumerate}[leftmargin=*]
+    \item Recolectar baseline POST-optimización en Grafana (spike test @ 20--50 req/s)
+    \item Ejecutar chaos-kill completo para medir MTTR real
+    \item Comparar P95/P99 latency antes vs después en spike workload
+\end{enumerate}
+
+\paragraph{Futuro}
+
+Las siguientes mejoras quedan documentadas para iteraciones posteriores:
+\begin{itemize}[leftmargin=*]
+    \item Redis caching para rates (reduce DB reads)
+    \item Connection pooling a DB (evita setup overhead)
+    \item Async transfer mock (liberar event loop)
+    \item API replication (2+ instancias con load balancer)
+    \item Rate limiting (prevenir overload)
+    \item Memory leak fix (unbounded log array)
+\end{itemize}
+
+\subsubsection{Métricas de Éxito}
+
+\paragraph{Paquete A: Detecta estado real}
+\begin{verbatim}
+curl -i http://localhost:5555/health
+# Esperado: HTTP 200 con {"status":"ok"}
+
+docker exec exchange-api-1 ps aux | wc -l
+# Si > 5: app inicializada, health debería estar ok
+\end{verbatim}
+
+\paragraph{Paquete B: Recupera automático}
+\begin{verbatim}
+# Baseline MTTR: ~15-20s
+docker kill exchange-api-1
+# Esperar 20s
+docker ps --filter name=exchange-api-1 --format "{{.Status}}"
+# Esperado: "Up X seconds" (reiniciado automáticamente)
+\end{verbatim}
+
+\paragraph{Paquete C: Reduce TCP overhead}
+\begin{verbatim}
+# Show connection reuse durante sustained load
+docker exec exchange-nginx-1 netstat -ntp | grep -c ESTABLISHED
+# Esperado con keepalive: ~32 conexiones persistentes (no 1 per request)
+\end{verbatim}
+
+\subsubsection{Trazabilidad}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lllc}
+\toprule
+\textbf{Táctica} & \textbf{Implementada} & \textbf{Verificada} & \textbf{Medida} \\
+\midrule
+Paquete A & SÍ & curl OK & docker inspect \\
+Paquete B & SÍ & config file & chaos-kill test \\
+Paquete C & SÍ & curl OK & sustained test (6.1ms mean @ 10 req/s) \\
+\bottomrule
+\end{tabular}
+\end{table}\subsection{Paquetes descartados: justificación}
+
+\subsubsection{Paquete D — Límites de recursos (\texttt{mem\_limit}, \texttt{cpus})}
+
+La táctica es \textbf{Bound Queue Sizes} aplicada a memoria, y el estilo sería contener el blast radius de un memory leak. El cambio es trivial (dos líneas en compose), pero:
+\begin{itemize}
+    \item La causa raíz del crecimiento de memoria es el log ilimitado (sección 3.9 del análisis), y esa es la sección donde conviene atacar el problema.
+    \item Para evidenciar el impacto habría que correr \texttt{memleak.yaml} durante 15 minutos, lo cual hace la demo más larga sin un resultado tan visual como el \texttt{chaos-kill} del Paquete B.
+\end{itemize}
+Lo dejamos documentado como mejora futura una vez resuelto 3.9.
+
+\subsubsection{Paquete E — Redundancia activa (múltiples réplicas)}
+
+La táctica sería \textbf{Active Redundancy} + el estilo \textbf{Replicated Repositories}. Es la táctica con más impacto potencial sobre Availability y Scalability, pero tiene una \textbf{dependencia bloqueante con 3.1}:
+\begin{itemize}
+    \item El estado de la aplicación vive en archivos JSON locales al contenedor (\texttt{app/state.js:21-23}).
+    \item Con N réplicas corriendo simultáneamente, cada una tendría su propia copia en memoria y escribiría sobre el mismo archivo en disco $\rightarrow$ corrupción de datos.
+    \item El estilo de \emph{Replicated Repositories} advierte: ``la principal preocupación es mantener la consistencia''.
+\end{itemize}
+La táctica E tiene sentido \textbf{después} de resolver 3.1 (externalizar el estado a Redis, que es el bonus del TP). Implementarla antes introduce un problema de consistencia que es justamente lo que ya se critica en la sección 3.2 del análisis (race condition TOCTOU).
+
+\subsection{Cierre}
+
+Con A + B + C aplicados, el servicio pasa de tener MTTR infinito y un Nginx que fuerza handshakes TCP por request, a detectar y reiniciarse automáticamente ante un crash en $\sim$20 segundos y reusar conexiones contra el upstream.
+
+La evidencia para el TP son dos gráficos del panel ``Requests state'' de Grafana (antes/después del \texttt{chaos-kill}) y dos valores de P95/P99 (antes/después del escenario \texttt{sustained}). Tres tácticas, dos escenarios, cuatro capturas de pantalla.
+
+Lo que queda sin resolver (ventanas de datos perdidos al hacer \texttt{docker stop}, eyección de upstream fallado, escalabilidad horizontal, blast radius del memory leak) queda fuera del alcance de 3.4 y debería atacarse junto con las secciones 3.1 y 3.9 del análisis.

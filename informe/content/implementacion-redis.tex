@@ -1,0 +1,155 @@
+
+\section{Escalabilidad horizontal con Redis}
+
+Hoy la app ya utiliza Redis en tiempo de ejecución (seeding desde \texttt{state/*.json}), por lo que la barrera principal (persistencia en archivos locales) ya no existe. Sin embargo, las implementaciones actuales hacen read-modify-write de estructuras completas (arrays/objetos serializados) y eso provoca race conditions bajo concurrencia. A continuación se listan los cambios recomendados.
+
+\subsection{Objetivos}
+
+\begin{itemize}[leftmargin=*]
+    \item Evitar races y pérdida de actualizaciones entre réplicas.
+    \item Usar primitivas atómicas de Redis o transacciones para operaciones concurrentes.
+    \item Cambiar estructuras que se leen/escriben completas (arrays JSON) por estructuras nativas de Redis.
+\end{itemize}
+
+\subsection{Cambios recomendados en \texttt{app/core/stateManager.js} (conceptual)}
+
+\begin{itemize}[leftmargin=*]
+    \item Mantener la inicialización (seed) tal como está; es aceptable que la primera réplica que arranque escriba datos si las claves no existen.
+    \item Asegurarse de exponer un cliente \texttt{redis} reutilizable para repositorios.
+\end{itemize}
+
+\subsection{Refactor por repositorio (ejemplos)}
+
+\subsubsection{\texttt{accountRepository}}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Problema actual:} se hace \texttt{getAccounts()} → modificar un elemento → \texttt{saveAccounts()} (set de todo el array). Bajo concurrencia se pierden actualizaciones.
+    \item \textbf{Recomendación:} almacenar cada cuenta como clave/hash Redis.
+    \begin{itemize}
+        \item Ejemplo de esquema: \texttt{HSET account:\{id\} id <id> balance <balance> currency <cur>} o \texttt{JSON.SET} si se usa RedisJSON.
+        \item Para incrementar balance de forma segura: usar \texttt{HINCRBYFLOAT account:\{id\} balance <delta>} o una transacción LUA que haga validaciones y ajustes atómicos.
+    \end{itemize}
+    \item \textbf{Código ejemplo (pseudocódigo):}
+\end{itemize}
+
+\begin{verbatim}
+// aumentar balance de forma atómica
+await redis.hincrbyfloat(`account:${id}`, 'balance', amount);
+// leer cuenta
+const data = await redis.hgetall(`account:${id}`);
+\end{verbatim}
+
+\subsubsection{\texttt{rateRepository}}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Problema actual:} \texttt{getRates()} devuelve objeto y \texttt{setRate()} reescribe todo el objeto.
+    \item \textbf{Recomendación:} usar hashes por base (\texttt{HSET rates:\{base\} \{counter\} \{rate\}}) o un hash global con keys compuestas (\texttt{HSET rates ``USD:ARS'' 350}).
+\end{itemize}
+
+\subsubsection{\texttt{logRepository}}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Problema actual:} el log se guarda como array completo; \texttt{add()} hace push + set del array.
+    \item \textbf{Recomendación:} usar lista Redis con \texttt{RPUSH log <json>} y leer con \texttt{LRANGE log 0 -1} o usar \texttt{LPUSH} + \texttt{LTRIM} para mantener tamaño límite.
+\end{itemize}
+
+\subsection{Opciones para operaciones compuestas y atomicidad}
+
+\begin{itemize}[leftmargin=*]
+    \item Usar operaciones atómicas de Redis (HINCRBYFLOAT, HSET, RPUSH) cuando cubran la necesidad.
+    \item Para read-modify-write complejo, usar \texttt{WATCH} + \texttt{MULTI} + \texttt{EXEC} (optimistic locking) o scripts Lua (mejor: ejecutan de forma atómica server-side).
+    \item \textbf{Ejemplo LUA para transferencia entre cuentas (debit/credit atómico):}
+\end{itemize}
+
+\begin{verbatim}
+-- args: srcKey, dstKey, amount
+local src = KEYS[1]
+local dst = KEYS[2]
+local amt = tonumber(ARGV[1])
+local srcBal = tonumber(redis.call('HGET', src, 'balance') or '0')
+if srcBal < amt then return {err='insufficient'} end
+redis.call('HINCRBYFLOAT', src, 'balance', -amt)
+redis.call('HINCRBYFLOAT', dst, 'balance', amt)
+return {ok='ok'}
+\end{verbatim}
+
+\subsection{Cambios en \texttt{docker-compose.yml} y Redis}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Persistencia:} añadir un volumen para Redis para no perder datos al reiniciar el contenedor.
+\end{itemize}
+
+\begin{verbatim}
+redis:
+  image: redis:7
+  volumes:
+    - redis_data:/data
+volumes:
+  redis_data:
+    driver: local
+\end{verbatim}
+
+\begin{itemize}[leftmargin=*]
+    \item Escalado local: \texttt{docker compose up --scale api=3 -d} (compose v2+). Para producción usar un orquestador (Swarm/Kubernetes).
+\end{itemize}
+
+\subsection{Cambios en Nginx (reverse proxy) para balanceo}
+
+\begin{itemize}[leftmargin=*]
+    \item No apuntar a una instancia concreta (\texttt{exchange-api-1}) sino al nombre de servicio \texttt{api} y habilitar resolución dinámica.
+    \item Ejemplo \texttt{nginx\_reverse\_proxy.conf} mínimo:
+\end{itemize}
+
+\begin{verbatim}
+resolver 127.0.0.11 valid=10s;
+upstream api {
+    server api:3000 resolve;
+    keepalive 32;
+}
+
+server {
+    listen 80;
+    location / {
+        proxy_pass http://api;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_read_timeout 10s;
+    }
+}
+\end{verbatim}
+
+Notas: con \texttt{resolve} Nginx consultará el DNS interno de Docker; en entornos reales preferir usar un LB que integre con el orchestrator.
+
+\subsection{Healthchecks y readiness}
+
+\begin{itemize}[leftmargin=*]
+    \item Mantener el \texttt{HEALTHCHECK} y asegurarse que cada réplica exponga un \texttt{/health} correcto (ya corregido para \texttt{await}).
+    \item Configurar \texttt{nginx} upstream \texttt{max\_fails}/\texttt{fail\_timeout} si hay réplicas para permitir eyección temporal de instancias fallidas.
+\end{itemize}
+
+\subsection{Pruebas y validación}
+
+\begin{itemize}[leftmargin=*]
+    \item Testear transferencias concurrentes con small load tests (Artillery) para detectar races.
+    \item Simular kills (\texttt{docker kill --signal=SIGKILL}) y verificar que el sistema mantiene consistencia tras recovery.
+\end{itemize}
+
+\subsection{Checklist mínimo para desplegar múltiples réplicas (resumen corto)}
+
+\begin{enumerate}[leftmargin=*]
+    \item[] \framebox{$\square$} Refactor \texttt{accountRepository} a HSET/HINCRBYFLOAT o LUA.
+    \item[] \framebox{$\square$} Refactor \texttt{rateRepository} a hashes (\texttt{HSET rates:\{base\}} o similar).
+    \item[] \framebox{$\square$} Refactor \texttt{logRepository} a \texttt{RPUSH} + \texttt{LRANGE} y limitar tamaño con \texttt{LTRIM}.
+    \item[] \framebox{$\square$} Añadir volumen persistente a Redis en \texttt{docker-compose.yml}.
+    \item[] \framebox{$\square$} Cambiar \texttt{nginx\_reverse\_proxy.conf} para usar \texttt{resolver} y \texttt{server api:3000 resolve;}.
+    \item[] \framebox{$\square$} Verificar healthchecks por réplica.
+    \item[] \framebox{$\square$} Ejecutar pruebas de concurrencia y ajustes (WATCH/MULTI o Lua si se detectan races).
+\end{enumerate}
+
+\subsection{Recursos adicionales}
+
+\begin{itemize}[leftmargin=*]
+    \item Redis transactions: \url{https://redis.io/docs/manual/transactions/}
+    \item Redis scripting (Lua): \url{https://redis.io/docs/manual/programmability/eval-intro/}
+    \item Redis data types (Hashes, Lists): \url{https://redis.io/docs/data-types/}
+\end{itemize}

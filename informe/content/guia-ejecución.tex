@@ -1,0 +1,62 @@
+\section{Configuraciones}
+
+\subsection{Requisitos Previos}
+
+\begin{itemize}[leftmargin=*]
+    \item Docker Desktop corriendo
+    \item Node.js 18+ instalado localmente
+    \item Haber ejecutado \texttt{npm install} dentro del directorio \texttt{perf/}
+\end{itemize}
+
+\subsection{Levantar el stack}
+
+\begin{verbatim}
+# Desde la raíz del proyecto
+docker compose up --build -d
+\end{verbatim}
+
+Verificar que todos los contenedores estén healthy:
+
+\begin{verbatim}
+docker compose ps
+\end{verbatim}
+
+Todos deben aparecer en estado \texttt{healthy} o \texttt{running}. Si \texttt{app1/app2/app3} aparece como \texttt{starting}, esperar \(\sim\)15 segundos y volver a verificar.
+
+Verificar que la API responde:
+
+\begin{verbatim}
+curl http://localhost:5555/health
+# Esperado: {"status":"ok"}
+\end{verbatim}
+
+\subsection{Configurar Grafana (primera vez)}
+
+\begin{enumerate}[leftmargin=*]
+    \item Abrir \texttt{http://localhost:80} en el browser (usuario/contraseña: \texttt{admin/admin}).
+    \item Ir a \textbf{Connections → Data Sources → Add data source}.
+    \item Elegir \textbf{Graphite}.
+    \item En el campo URL ingresar: \texttt{http://graphite:80}
+    \item Hacer click en \textbf{Save \& test} — debe aparecer ``Data source is working''.
+    \item Ir a \textbf{Dashboards → Import}.
+    \item Hacer click en \textbf{Upload dashboard JSON file} y seleccionar \texttt{perf/dashboard.json}.
+    \item Asignar el datasource Graphite y hacer \textbf{Import}.
+\end{enumerate}
+
+El dashboard queda guardado permanentemente en el volumen de Grafana.
+
+\subsection{Limpiar y reiniciar el stack entre pruebas}
+
+Si los saldos de las cuentas se agotan durante las pruebas de stress (el exchange empieza a devolver 500), se puede reiniciar el estado:
+
+\begin{verbatim}
+# Reiniciar solo la app (Redis mantiene el estado si se configuró persistencia)
+docker compose restart app1 app2 app3
+\end{verbatim}
+
+Para empezar desde cero:
+
+\begin{verbatim}
+docker compose down -v   # borra volúmenes incluyendo Redis
+docker compose up --build -d
+\end{verbatim}

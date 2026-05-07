@@ -26,47 +26,17 @@ La arquitectura propuesta introduce una separación en capas con responsabilidad
 
 \subsubsection{Atributos de calidad afectados}
 
-\paragraph{Testability}
+\subsubsection{Testability}
 Es el atributo más beneficiado por este cambio. En la arquitectura original, testear el \textbf{Exchange Service} implicaba activar toda la cadena de componentes, ya que no había separación entre lógica de negocio, acceso a datos y manejo de estado. En la nueva arquitectura, cada capa puede probarse de forma aislada: los Controllers pueden testearse con mocks de los Services, los Services con mocks de los Repositories, y los Repositories con mocks del \textbf{State Manager}. Esto permite pruebas unitarias verdaderas y facilita la detección temprana de bugs.
 
-\paragraph{Maintainability}
+\subsubsection{Maintainability}
 También mejora considerablemente. La separación por capas y por responsabilidades hace que encontrar a nivel de código dónde está cada cosa sea más fácil e intuitivo, sin tener que recorrer código ajeno a lo que se busca. Si surge un bug, el patrón establecido lo hace directo de encontrar; cada feature nuevo sigue la misma estructura.
 
-\paragraph{Modifiability}
+\subsubsection{Modifiability}
 El cambio tiene un impacto positivo significativo. Con la arquitectura anterior, agregar un nuevo dominio o modificar uno existente podía requerir alterar componentes compartidos como el \textbf{Exchange Service}, propagando el riesgo de cambio por toda la cadena. En la nueva arquitectura, cada dominio es una columna vertical independiente (\textbf{Controller} $\rightarrow$ \textbf{Service} $\rightarrow$ \textbf{Repository}), de modo que agregar un nuevo dominio implica simplemente agregar una nueva columna sin tocar las existentes. Del mismo modo, cambiar la fuente de datos de los logs, por ejemplo, solo requiere modificar el \textbf{Log Repository}, sin afectar al \textbf{Log Service} ni al \textbf{Log Controller}. Esto reduce el costo y el riesgo de cada modificación futura.
 
-\paragraph{Performance (atributo afectado negativamente)}
-Si bien en teoría la nueva arquitectura introduce más niveles de indirección y por lo tanto podría esperarse un impacto negativo en la latencia, en la práctica las métricas no mostraron diferencias significativas respecto a la arquitectura anterior, o las diferencias registradas fueron lo suficientemente pequeñas como para considerarse despreciables. El overhead generado por los saltos adicionales entre capas no se tradujo en una degradación observable del sistema.
-
-
-\subsection{Variables en memoria}
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=\textwidth]{images/redis component and connectors.png}
-\captionof{diagrama}{Arquitectura con Redis como almacenamiento centralizado. Las tres decisiones de diseño que siguen —variables en memoria, persistencia lazy y persistencia en archivos JSON— fueron resueltas todas juntas mediante la incorporación de Redis. El \textbf{State Manager} ya no persiste en archivos locales sino que delega en Redis, que actúa como fuente de verdad única y compartida entre todas las instancias.}
-\label{diag:arquitectura_redis}
-\end{figure}
-
-Accounts, rates y log son variables JavaScript dentro del proceso. Leer es instantáneo (bueno para \textit{performance}), pero hace imposible escalar horizontalmente porque cada instancia tendría su propio estado desincronizado. Además genera una \textit{race condition}: dos requests concurrentes pueden leer el mismo balance, pasar ambos el check de fondos, y producir doble gasto.
-
-\subsubsection{Mejora propuesta}
-
-Dado que el estado en memoria hacía imposible la escalabilidad horizontal y generaba una \textit{race condition} que podía derivar en doble gasto, se decidió incorporar Redis como almacenamiento centralizado. De esta forma el estado deja de vivir dentro del proceso y pasa a una fuente de verdad única y compartida entre todas las instancias, eliminando la desincronización y permitiendo operaciones atómicas.
-
-\subsubsection{Atributos de calidad afectados}
-
-\paragraph{Scalability}
-El atributo más impactado. El estado deja de vivir dentro del proceso y pasa a un almacenamiento externo compartido. Antes era imposible levantar múltiples instancias porque cada una tendría su propio estado desincronizado; con Redis esto queda resuelto.
-
-\paragraph{Reliability}
-La race condition del doble gasto desaparece porque Redis permite operaciones atómicas, de modo que dos requests concurrentes ya no pueden leer el mismo balance y pasar ambas el check de fondos simultáneamente.
-
-\paragraph{Performance (atributo afectado negativamente)}
-Leer una variable en memoria es instantáneo, mientras que cada operación contra Redis implica una llamada de red. En la práctica esta latencia suele ser de un par de milisegundos y resulta aceptable, pero es un costo real que antes no existía.
-
-
-\subsection{Persistencia lazy}
+\subsubsection{Performance (atributo afectado negativamente)}
+Si bien en teoría la nueva arquitectura introduce más niveles de indirección y por lo tanto podría esperarse un impacto negativo en la latencia, en la práctica las métricas no mostraron diferencias significativas respecto a la arquitectura anterior, o las diferencias registradas fueron lo suficientemente pequeñas como para considerarse despreciables. El overhead generado por los saltos adicionales entre capas no se tradujo en una degradación observable del sistema.\subsection{Persistencia lazy}
 
 El estado se guarda a disco cada 1-5 segundos en lugar de en cada operación. Simplifica el código y no bloquea requests con I/O, pero si el proceso muere entre guardados se pierden transacciones, violación de durabilidad.
 
@@ -76,10 +46,10 @@ Con la incorporacion de Redis, decidimos remover la persistencia lazy a disco. R
 
 \subsubsection{Atributos de calidad afectados}
 
-\paragraph{Durability}
+\subsubsection{Durability}
 La ventana de pérdida de datos que generaba el guardado cada 1-5 segundos desaparece. Si el proceso muere, las transacciones están garantizadas porque Redis las persistió antes de confirmarlas.
 
-\paragraph{Performance}
+\subsubsection{Performance}
 Dependiendo del nivel de durabilidad que se configure en Redis, puede agregarse algo de latencia por operación. Es un costo generalmente aceptable frente a la garantía que ofrece, pero es un trade-off que hay que tener en cuenta.
 
 \subsection{Persistencia en archivos json}
@@ -92,39 +62,11 @@ Con la incorporación de Redis, se reemplazó completamente la persistencia en a
 
 \subsubsection{Atributos de calidad afectados}
 
-\paragraph{Reliability}
+\subsubsection{Reliability}
 El riesgo de corrupción de archivos ya no está. Redis maneja la integridad de los datos de forma mucho más robusta que un archivo JSON que puede quedar en estado inconsistente si el proceso muere en medio de una escritura.
 
-\paragraph{Availability}
-El sistema ahora depende de Redis como infraestructura adicional que hay que operar y monitorear. Si Redis no está disponible el sistema no funciona, introduciendo un nuevo punto de falla que antes no existía.
-
-
-\subsubsection{Función transfer() mockeada de forma secuencial}
-
-\begin{lstlisting}[language=javascript, caption={Ejemplo de función \texttt{transfer()}}, label={lst:transfer}]
-async function transfer(fromAccountId, toAccountId, amount) {
- const min = 200;
- const max = 400;
- return new Promise((resolve) =>
-   setTimeout(() => resolve(true), Math.random() * (max - min + 1) + min));
-}
-\end{lstlisting}
-
-La función ignora todos sus parámetros y siempre resuelve true tras un delay aleatorio de 200–400 ms.
-
-
-\subsection{Instancia única sin redundancia ni healthcheck}
-
-Impacto sobre Availability
-La API es un Single Point of Failure (SPOF). Un crash del proceso Node.js (error no capturado, OOM, señal del OS), un reinicio por deploy o cualquier excepción no manejada detiene completamente el servicio. Sin `healthcheck` declarado, Docker y Nginx no pueden detectar automáticamente que el contenedor dejó de responder. Nginx continuará enrutando requests al upstream caído, retornando 502 Bad Gateway a todos los usuarios.
-
-Impacto sobre User-Perceived Performance
-Sin distribución de carga entre instancias, todos los requests concurrentes comparten el único event loop de Node.js. Las esperas de `await transfer()` (400–800 ms por request) bloquean efectivamente el procesamiento del resto de requests que llegan mientras tanto.
-
-Impacto sobre Scalability
-Nginx no está configurado para balancear hacia múltiples backends. Aunque se pudieran levantar réplicas (`docker compose up --scale api=3`), el upstream hardcodeado a `exchange-api-1` ignorará las instancias adicionales. Para habilitar el balanceo se requiere modificar la configuración de Nginx.
-
-\subsubsection{Mejora propuesta}
+\subsubsection{Availability}
+El sistema ahora depende de Redis como infraestructura adicional que hay que operar y monitorear. Si Redis no está disponible el sistema no funciona, introduciendo un nuevo punto de falla que antes no existía.\subsubsection{Mejora propuesta}
 
 Con Redis como estado compartido y Nginx reconfigurado para balancear carga, el \textbf{API Server} pasa de ser una instancia única a poder escalar horizontalmente ($1..*$). Nginx distribuye los requests entre las réplicas disponibles, eliminando el SPOF y permitiendo absorber mayor carga concurrente.
 
@@ -134,3 +76,455 @@ Con Redis como estado compartido y Nginx reconfigurado para balancear carga, el 
 \label{diag:arquitectura_multiple_instancias}
 \end{center}
 
+\subsection{Persistencia en archivos JSON con guardado periódico}
+
+\textbf{Archivos:} \texttt{app/state.js:16–23}, \texttt{app/state.js:55–68}
+
+\begin{verbatim}
+// Carga inicial desde disco
+accounts = await load(ACCOUNTS);  // state.js:17
+rates    = await load(RATES);     // state.js:18
+log      = await load(LOG);       // state.js:19
+
+// Guardado periódico asíncrono
+scheduleSave(accounts, ACCOUNTS, 1000);  // cada 1 segundo
+scheduleSave(rates,    RATES,    5000);  // cada 5 segundos
+scheduleSave(log,      LOG,      1000);  // cada 1 segundo
+\end{verbatim}
+
+El estado vive en memoria y se persiste asíncronamente en intervalos regulares. No hay escritura atómica (se usa \texttt{writeFile} directamente, sin write-to-temp-then-rename).
+
+\textbf{Impacto sobre Availability ↓↓:} Un crash durante \texttt{writeFile} (por ejemplo, disco lleno o SIGKILL) deja el archivo JSON parcialmente escrito. Al reiniciar, \texttt{JSON.parse} lanza una excepción en \texttt{state.js:45} y el servicio no puede cargar su estado, quedando inutilizable hasta intervención manual.
+
+\textbf{Impacto sobre Efficiency ↓↓:} El array \texttt{log} crece ilimitadamente (\texttt{exchange.js:108}). \texttt{scheduleSave} serializa el array completo cada 1 segundo mediante \texttt{JSON.stringify}. Con alta carga sostenida, esta operación escala linealmente en CPU y tiempo, compitiendo con el procesamiento de requests.
+
+\textbf{Impacto sobre Scalability ↓↓↓:} Es arquitecturalmente imposible correr más de una réplica simultánea de la API. Dos procesos escribiendo el mismo \texttt{accounts.json} en simultáneo producirían corrupción de datos sin ningún mecanismo de coordinación (no hay locking de archivo, no hay transacciones). Este es el principal bloqueante para escalar horizontalmente.
+
+\textbf{Impacto sobre Testability ↓:} Los tests de integración deben preparar y limpiar archivos JSON en disco. No hay interfaz para inyectar estado en memoria sin tocar el filesystem.
+
+\subsection{Estado en memoria sin control de concurrencia (race condition TOCTOU)}
+
+\textbf{Archivo:} \texttt{app/exchange.js:81–105}
+
+\begin{verbatim}
+// CHECK: se verifica el saldo disponible
+if (counterAccount.balance >= counterAmount) {
+  // PAUSA asíncrona: ~200–400 ms (primera transferencia)
+  if (await transfer(clientBaseAccountId, baseAccount.id, baseAmount)) {
+    // PAUSA asíncrona: ~200–400 ms (segunda transferencia)
+    if (await transfer(counterAccount.id, clientCounterAccountId, counterAmount)) {
+      // USE: recién aquí se descuenta el saldo
+      counterAccount.balance -= counterAmount;  // exchange.js:90
+\end{verbatim}
+
+El chequeo de saldo (línea 81) y la actualización (línea 90) están separados por hasta 800 ms de operaciones asíncronas. Durante ese intervalo, el event loop de Node.js puede procesar otros requests entrantes, todos los cuales leen el saldo sin modificar.
+
+\textbf{Escenario de explotación bajo concurrencia:}
+
+\begin{verbatim}
+Saldo inicial counterAccount (USD): 600
+Request A: counterAmount = 500
+Request B: counterAmount = 500
+
+t=0ms    Request A: 600 >= 500 -> true  (CHECK pasa)
+t=0ms    Request B: 600 >= 500 -> true  (CHECK pasa, A aún no debitó)
+t=400ms  Request A completa transfers -> saldo = 600 - 500 = 100
+t=400ms  Request B completa transfers -> saldo = 100 - 500 = -400  <- SALDO NEGATIVO
+\end{verbatim}
+
+Ambas operaciones se registran como \texttt{ok: true}. El servicio emite fondos que no posee.
+
+\textbf{Impacto sobre User-Perceived Performance ↓↓:} Bajo carga concurrente, todos los requests de \texttt{POST /exchange} están activos simultáneamente esperando sus \texttt{await transfer()}. El tiempo de respuesta percibido por el usuario no es solo el de su request, sino el de todos los que compiten en el event loop.
+
+\textbf{Impacto sobre Availability ↓:} Si el saldo llega a negativo, las siguientes operaciones legítimas que debieran ser exitosas pueden fallar erróneamente (el sistema cree que no tiene fondos cuando en realidad los tiene en otra moneda). Esto puede derivar en un estado del que el servicio no se recupera sin intervención.
+
+\textbf{Impacto sobre Testability ↓↓:} La race condition es difícil de reproducir en tests unitarios porque depende del timing del event loop. Requeriría tests de concurrencia específicos que el proyecto no tiene infraestructura para ejecutar.
+
+\subsection{Función \texttt{transfer()} mockeada de forma secuencial}
+
+\textbf{Archivo:} \texttt{app/exchange.js:114–120}
+
+\begin{verbatim}
+async function transfer(fromAccountId, toAccountId, amount) {
+  const min = 200;
+  const max = 400;
+  return new Promise((resolve) =>
+    setTimeout(() => resolve(true), Math.random() * (max - min + 1) + min));
+}
+\end{verbatim}
+
+La función ignora todos sus parámetros y siempre resuelve \texttt{true} tras un delay aleatorio de 200–400 ms. Las dos llamadas en \texttt{exchange()} son \textbf{secuenciales} (líneas 83 y 86: la segunda \texttt{await} comienza solo cuando la primera termina).
+
+\textbf{Impacto sobre User-Perceived Performance ↓↓:} Cada \texttt{POST /exchange} consume un mínimo garantizado de 400 ms y un máximo de \(\sim\)800 ms solo en espera de transfers, antes de cualquier procesamiento. Bajo carga, los requests se encolan en el event loop y la latencia percibida crece linealmente.
+
+\textbf{Impacto sobre Efficiency ↓:} Las dos llamadas podrían ser paralelas (\texttt{Promise.all}) sin afectar la corrección del flujo, reduciendo la latencia mínima a 200–400 ms. La decisión de hacerlas secuenciales duplica innecesariamente el tiempo de espera.
+
+\textbf{Impacto sobre Visibility ↓↓:} Las métricas de latencia del dashboard de Grafana reflejan estos 400–800 ms artificiales. Cuando se integre el servicio real de transferencias, las métricas históricas no serán comparables ni útiles como baseline.
+
+\textbf{Impacto sobre Testability ↓↓:} El camino de falla de la segunda transferencia (rollback en línea 95) nunca se ejecuta porque \texttt{transfer()} nunca falla. Ese código existe pero no ha sido testeado. Su corrección bajo condiciones reales es desconocida.
+
+\textbf{Impacto sobre Interoperability ↓↓:} No existe contrato definido para el servicio de transferencias real. No hay interfaz, tipo de retorno especificado ni manejo de errores diseñado para el caso donde la transferencia falla parcialmente. La integración futura deberá rediseñar esta parte del flujo.
+
+\subsection{Instancia única sin redundancia ni healthcheck}
+
+\textbf{Archivos:} \texttt{docker-compose.yml} (completo), \texttt{nginx\_reverse\_proxy.conf}
+
+\begin{verbatim}
+# nginx_reverse_proxy.conf
+upstream api {
+    server exchange-api-1:3000;   ← único upstream, hardcodeado
+}
+server {
+    listen 80;
+    location / {
+        proxy_pass http://api/;
+        # sin timeouts, sin retry, sin health, sin keepalive
+    }
+}
+\end{verbatim}
+
+\begin{verbatim}
+# docker-compose.yml — sin réplicas, sin healthcheck, sin restart policy
+services:
+  api:
+    build: ./app
+    # sin deploy.replicas
+    # sin healthcheck
+    # sin restart: unless-stopped
+    # sin límite de memoria
+    # sin límite de CPU
+\end{verbatim}
+
+Esta es una de las decisiones de diseño con más superficie de impacto. A continuación se detallan los modos de falla específicos, el blast radius y los QA afectados.
+
+\subsubsection{Modos de falla que quedan silenciosos sin healthcheck}
+
+Un healthcheck distingue entre ``proceso corriendo'' y ``proceso respondiendo correctamente''. Sin él, Docker y Nginx solo saben si el PID 1 del contenedor está vivo. Los siguientes modos de falla dejan el contenedor en estado ``running'' pero el servicio efectivamente caído:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Event loop bloqueado por operación síncrona.} Node.js es single-threaded. Una operación síncrona costosa (e.g., \texttt{JSON.stringify} sobre un \texttt{log} de millones de entradas en \texttt{state.js:58}) congela el procesamiento de requests durante segundos. Docker reporta el contenedor ``running'' durante todo ese tiempo; Nginx sigue enviando requests que se encolan en el socket TCP hasta timeout.
+    \item \textbf{GC thrashing por crecimiento del heap.} El array \texttt{log} crece sin límite (\texttt{exchange.js:108}). Antes de que V8 lance OOM, entra en ciclos de garbage collection cada vez más largos y frecuentes (``GC pause''), degradando la latencia sin crashear. Este estado puede durar minutos antes del crash terminal.
+    \item \textbf{Fallo silencioso de \texttt{scheduleSave}.} Los \texttt{setInterval} en \texttt{state.js:21–23} ejecutan \texttt{save()} sin manejo de error en caso de que \texttt{writeFile} falle repetidamente (disco lleno, permisos, corrupción del FS). El error se loguea a \texttt{console.error} (\texttt{state.js:60}) y el intervalo continúa reintentando. El estado en memoria diverge del estado en disco sin que nadie se entere.
+    \item \textbf{Archivo JSON corrupto tras crash.} \texttt{state.js:58} usa \texttt{writeFile} directo (no atómico). Un crash durante la escritura deja el archivo con JSON parcial. En el próximo restart, \texttt{load()} en \texttt{state.js:45} lanza en \texttt{JSON.parse}, el catch en línea 46 loguea el error y retorna \texttt{undefined}. El servicio queda con \texttt{accounts = undefined} pero ``running''. El primer request a \texttt{/exchange} produce un \texttt{TypeError} no capturado.
+    \item \textbf{Inicialización larga.} Al arrancar, \texttt{app.js:13} ejecuta \texttt{await exchangeInit()} que a su vez lee los tres archivos JSON secuencialmente (\texttt{state.js:17–19}). Con un \texttt{log.json} grande, esto puede tomar varios segundos. Durante ese intervalo el puerto 3000 no escucha aún. Nginx, sin healthcheck, intenta proxear requests al upstream y obtiene \texttt{connection refused} → 502.
+\end{enumerate}
+
+\subsubsection{Blast radius: cualquier falla = todos los usuarios afectados}
+
+Al existir una única instancia, la falla no puede ser parcial:
+\begin{itemize}
+    \item No hay \textbf{isolation entre usuarios}: un usuario que dispare un input que causa TypeError (sección 3.8) crashea el proceso y afecta a todos.
+    \item No hay \textbf{isolation entre endpoints}: \texttt{GET /log} serializa todo el log y bloquea el event loop → \texttt{POST /exchange} de otro usuario se queda esperando.
+    \item No hay \textbf{circuit breaker}: si el servicio externo de transferencias (cuando se integre real en reemplazo del mock de \texttt{exchange.js:114}) se degrada, todos los \texttt{POST /exchange} se encolan en el event loop aumentando la memoria y eventualmente tumbando el proceso.
+    \item No hay \textbf{bulkhead}: los requests de lectura (\texttt{GET /rates}, relativamente baratos) comparten el mismo event loop que los requests pesados (\texttt{POST /exchange} con sus 400–800 ms). Bajo carga del segundo, los primeros se degradan igual.
+\end{itemize}
+
+\subsubsection{Configuración de Nginx: mala incluso asumiendo instancia única}
+
+El bloque \texttt{upstream} tiene carencias que amplifican el problema aún con una sola instancia:
+
+\begin{verbatim}
+# lo que falta en nginx_reverse_proxy.conf:
+
+upstream api {
+    server exchange-api-1:3000
+        # ausente: Nginx no marca el upstream como down
+        max_fails=3 fail_timeout=30s;
+    # ausente: cada request abre conexión TCP nueva al upstream
+    keepalive 32;
+}
+
+server {
+    listen 80;
+    location / {
+        proxy_pass http://api/;
+        # ausente: si el upstream cuelga, el cliente espera el default (60s)
+        proxy_connect_timeout 5s;
+        # ausente
+        proxy_read_timeout    10s;
+        # ausente: no hay retry hacia otro upstream (no hay otro, pero tampoco lógica de reintento)
+        proxy_next_upstream error timeout;
+
+        # ausente: necesario para keepalive con el upstream
+        proxy_http_version 1.1;
+        # ausente: necesario para keepalive
+        proxy_set_header Connection "";
+
+        # Sin headers informativos al upstream:
+        # proxy_set_header X-Real-IP $remote_addr;
+        # proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+\end{verbatim}
+
+\textbf{Consecuencias concretas:}
+\begin{itemize}
+    \item Sin \texttt{keepalive}, cada request entrante a Nginx abre y cierra una conexión TCP nueva contra el contenedor de la API. En una prueba de carga sostenida, esto satura la tabla de sockets (TIME\_WAIT) del kernel mucho antes que la app realmente se quiebre.
+    \item Sin \texttt{proxy\_read\_timeout}, un request \texttt{POST /exchange} que quede colgado por un \texttt{await transfer()} que nunca resuelve (en una integración real con un banco lento) ocupa un worker de Nginx hasta el default de 60 segundos.
+    \item Sin \texttt{proxy\_next\_upstream} ni backends alternativos, cualquier error del upstream es un 502 al cliente sin mitigación.
+    \item Sin \texttt{X-Forwarded-For}, el log de aplicación (si existiera uno real) no puede identificar la IP original del cliente.
+\end{itemize}
+
+\subsubsection{Docker Compose: lo que falta en la declaración del servicio}
+
+\begin{verbatim}
+# lo que debería tener services.api en docker-compose.yml:
+  api:
+    build: ./app
+    # ausente: Docker no reinicia el contenedor si muere
+    restart: unless-stopped
+    deploy:
+       ausente: permitiría escalar horizontalmente
+      replicas: 3
+      resources:
+        limits:
+          # ausente: sin límite, el contenedor puede agotar la RAM del host
+          memory: 512M
+          # ausente
+          cpus: "1.0"
+    # ausente completamente
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+\end{verbatim}
+
+\textbf{Consecuencias concretas:}
+\begin{itemize}
+    \item Sin \texttt{restart: unless-stopped}, un crash del proceso Node.js deja el contenedor en estado ``exited'' hasta intervención manual. El sistema queda caído indefinidamente.
+    \item Sin endpoint de health en la aplicación (\texttt{/health} o \texttt{/ready}), no hay manera de implementar el healthcheck de Docker aunque se quisiera. El servicio debe exponer un endpoint trivial que verifique al menos: proceso vivo, estado cargado (\texttt{accounts !== undefined}), y opcionalmente, acceso al filesystem de estado.
+    \item Sin límite de memoria, el memory leak del log crece hasta consumir toda la RAM del host, afectando también a los otros servicios (graphite, grafana, nginx).
+\end{itemize}
+
+\subsubsection{Tácticas que resuelven este problema}
+
+Ordenadas por costo de implementación:
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Endpoint de health (\texttt{/health})} en la app + \texttt{healthcheck} en \texttt{docker-compose.yml}. Costo bajo, permite detectar el estado degradado antes de impactar al usuario.
+    \item \texttt{\textbf{restart: unless-stopped}} en el servicio api. Costo nulo, mitiga el MTTR ante crashes.
+    \item \textbf{Límites de recursos} (\texttt{mem\_limit}, \texttt{cpus}) para contener el blast radius del memory leak.
+    \item \textbf{Keepalive y timeouts en Nginx} para evitar la saturación de sockets y liberar workers ante upstreams lentos.
+    \item \textbf{Node.js cluster} (módulo \texttt{cluster} o PM2) para aprovechar múltiples CPUs dentro del mismo contenedor. No resuelve el problema de SPOF ni el de state sharing, pero mejora la capacidad de un nodo único.
+    \item \textbf{Múltiples réplicas + state externalizado (Redis)} para escalado horizontal real. Es la solución definitiva pero requiere refactorizar \texttt{state.js} para eliminar el estado en memoria por proceso.
+\end{enumerate}
+
+Las tácticas 1–4 son mejoras quirúrgicas con impacto inmediato sobre Availability y Performance. La táctica 6 es la única que escala Scalability más allá de un solo nodo, pero está bloqueada por la decisión 3.1 (persistencia en JSON local).
+
+\subsubsection{Resumen de impacto sobre QA}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcp{8cm}}
+\toprule
+\textbf{QA} & \textbf{Impacto} & \textbf{Razón principal} \\
+\midrule
+Availability & ↓↓↓ & SPOF + sin healthcheck + sin restart policy + sin límites de recursos \\
+User-Perceived Performance & ↓↓ & Event loop único compartido por todos los requests; sin keepalive \\
+Efficiency & ↓ & Sin keepalive, cada request abre TCP nuevo; GC thrashing invisible \\
+Scalability & ↓↓↓ & Upstream hardcodeado + estado local impiden réplicas \\
+Visibility & ↓ & Sin healthcheck no se distingue ``running'' de ``healthy''; modos de falla invisibles \\
+Portability & ↓ & Nombre de contenedor generado por Compose hardcodeado en Nginx \\
+Testability & ↓ & Sin endpoint de health, los tests smoke post-deploy no tienen contra qué verificar \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Sin autenticación ni autorización propias}
+
+\textbf{Archivo:} \texttt{app/README.md:5}
+
+\begin{verbatim}
+Este servicio no maneja seguridad, eso lo resuelve vaultSec, para cuando llega al nginx,
+el request está autenticado y autorizado. TODO: replicar vaultSec!!!
+\end{verbatim}
+
+\texttt{vaultSec} no existe en este repositorio ni aparece en \texttt{docker-compose.yml}. En el estado actual, cualquier cliente que alcance el puerto 5555 tiene acceso irrestricto a todas las operaciones.
+
+\textbf{Impacto sobre Security ↓↓↓:}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Endpoint} & \textbf{Riesgo sin autenticación} \\
+\midrule
+\texttt{GET /accounts} & Expone los saldos internos de la empresa \\
+\texttt{PUT /accounts/:id/balance} & Permite fijar cualquier saldo arbitrariamente \\
+\texttt{PUT /rates} & Permite manipular las tasas de cambio para todos los usuarios \\
+\texttt{POST /exchange} & Permite ejecutar cambios con cuentas de cualquier usuario \\
+\texttt{GET /log} & Expone el historial completo de operaciones financieras \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+No hay HTTPS configurado en el stack (Nginx escucha en HTTP plano), por lo que las credenciales y datos financieros viajan sin cifrar por la red.
+
+\textbf{Impacto sobre Interoperability ↓:} Sin un esquema de autenticación definido (JWT, API keys, OAuth), las apps mobile externas no pueden integrarse de forma segura. El contrato de seguridad entre el cliente y el servicio es indefinido.
+
+\subsection{Sin instrumentación en la aplicación}
+
+\textbf{Archivos:} \texttt{app/app.js}, \texttt{app/exchange.js} (sin ningún cliente de StatsD)
+
+El stack de observabilidad (StatsD → Graphite → Grafana) existe, pero la aplicación no está instrumentada. No hay ningún cliente de StatsD en el código Node.js. Los únicos datos que llegan a Grafana son:
+\begin{itemize}
+    \item \textbf{Artillery:} métricas del generador de carga (latencia del cliente, RPS, códigos HTTP).
+    \item \textbf{cAdvisor:} métricas de contenedores (CPU, memoria del proceso completo).
+\end{itemize}
+
+\textbf{Impacto sobre Visibility ↓↓↓:} No se captura ninguna métrica de negocio ni de comportamiento interno:
+\begin{itemize}
+    \item No se mide el número de exchanges exitosos vs. fallidos por motivo (fondos insuficientes, error de sistema).
+    \item No se mide el volumen operado por par de monedas (ARS/USD, USD/EUR, etc.).
+    \item No se mide la evolución de los saldos de las cuentas internas.
+    \item No se detecta cuándo un saldo está próximo a agotarse (riesgo de parar operaciones).
+    \item No se puede distinguir la latencia de la lógica de negocio de la latencia de la capa de red.
+    \item Los errores de la aplicación solo aparecen en \texttt{console.error}, no en ningún sistema de alertas.
+\end{itemize}
+El panel de Grafana muestra latencia y RPS, pero todo medido desde el generador de carga, no desde el servidor. Una degradación interna del servicio (por ejemplo, I/O lento al guardar el log) sería invisible hasta que impacte en la latencia cliente.
+
+\subsection{HTTP 500 para errores de negocio}
+
+\textbf{Archivo:} \texttt{app/app.js:88–92}
+
+\begin{verbatim}
+if (exchangeResult.ok) {
+  res.status(200).json(exchangeResult);
+} else {
+  res.status(500).json(exchangeResult);  // fondos insuficientes → 500
+}
+\end{verbatim}
+
+Una operación rechazada por fondos insuficientes retorna HTTP 500 Internal Server Error, el mismo código que un crash del servidor.
+
+\textbf{Impacto sobre Visibility ↓↓:} El panel ``Requests State'' del dashboard de Grafana agrupa en ``Errors'' tanto los crashes de infraestructura como los rechazos de negocio normales. Es imposible saber si la tasa de error aumentó porque el servidor está fallando o porque los usuarios se quedan sin fondos. Las alertas sobre ese panel son inherentemente ruidosas e inaccionables.
+
+\textbf{Impacto sobre Usabilidad ↓↓↓:} Las apps mobile que consumen esta API deben tratar el \texttt{ok: false} dentro del body JSON para distinguir el rechazo de negocio del error de servidor, ya que el código HTTP no lo informa correctamente. La mayoría de los frameworks HTTP cliente (y las apps de los usuarios) interpretan un 500 como ``el servidor rompió'', no como ``no tenés fondos'', generando mensajes de error confusos para el usuario final. El código correcto sería HTTP 422 (Unprocessable Entity) para rechazos de negocio.
+
+\subsection{Validación de entrada por falsiness}
+
+\textbf{Archivo:} \texttt{app/app.js:75–83} (y equivalentes en otros endpoints)
+
+\begin{verbatim}
+if (!baseCurrency || !counterCurrency || !baseAccountId || !counterAccountId || !baseAmount) {
+  return res.status(400).json({ error: "Malformed request" });
+}
+\end{verbatim}
+
+La validación verifica únicamente que los campos no sean falsy en JavaScript (\texttt{null}, \texttt{undefined}, \texttt{""}, \texttt{0}, \texttt{false}, \texttt{NaN}).
+
+\textbf{Problemas concretos identificados:}
+\begin{enumerate}
+    \item \texttt{PUT /accounts/:id/balance} con \texttt{balance: 0} retorna 400 — el operador no puede llevar una cuenta a cero saldo.
+    \item \texttt{baseAmount: -100} es válido — invierte la dirección efectiva del cambio, permitiendo que un usuario ``venda'' un monto negativo.
+    \item Si \texttt{baseCurrency} no existe en \texttt{rates}, la línea \texttt{exchange.js:61} ejecuta \texttt{rates[baseCurrency][counterCurrency]} donde \texttt{rates[baseCurrency]} es \texttt{undefined}, lanzando \texttt{TypeError: Cannot read properties of undefined}. Express captura la excepción y retorna 500 genérico, sin ningún mensaje útil.
+    \item El mensaje de error ``Malformed request'' no indica qué campo falta o tiene formato incorrecto.
+\end{enumerate}
+
+\textbf{Impacto sobre Security ↓:} La ausencia de validación de rango y tipo permite producir estados inválidos mediante inputs deliberadamente malformados (montos negativos, divisas inexistentes).
+
+\textbf{Impacto sobre Usabilidad ↓↓:} Los mensajes de error no son accionables para el desarrollador de la app mobile. ``Malformed request'' no dice qué campo es el problema. El crash por TypeError retorna 500, haciendo indistinguible un error de validación de un error del servidor.
+
+\textbf{Impacto sobre Testability ↓:} El comportamiento inconsistente (algunos inputs inválidos retornan 400, otros producen 500 por TypeError) hace difícil escribir tests de validación exhaustivos.
+
+\subsection{Log de transacciones ilimitado en memoria}
+
+\textbf{Archivos:} \texttt{app/exchange.js:108}, \texttt{app/state.js:19, 23}
+
+\begin{verbatim}
+log.push(exchangeResult);           // exchange.js:108 — sin límite ni rotación
+scheduleSave(log, LOG, 1000);       // state.js:23 — serializa el array completo cada 1s
+\end{verbatim}
+\texttt{GET /log} retorna el array completo sin paginación ni filtros.
+
+\textbf{Impacto sobre Network Performance ↓↓:} El payload de \texttt{GET /log} crece linealmente con el número de transacciones. En producción con carga sostenida, una respuesta que inicialmente pesa kilobytes puede llegar a megabytes, saturando el ancho de banda del cliente y el tiempo de serialización del servidor.
+
+\textbf{Impacto sobre Efficiency ↓↓:} \texttt{JSON.stringify(log)} ejecutado cada 1 segundo consume CPU y tiempo proporcional al tamaño del array. Con millones de entradas, esta operación compite activamente con el procesamiento de requests, degradando la latencia del sistema completo.
+
+\textbf{Impacto sobre Availability ↓:} El crecimiento ilimitado del array en memoria puede eventualmente agotar el heap de Node.js. Cuando el proceso supera el límite de memoria del contenedor (sin límite configurado en docker-compose.yml), el OS lo termina y el servicio se reinicia, perdiendo el estado en memoria no persistido.
+
+\textbf{Impacto sobre Usabilidad ↓:} Sin paginación ni filtros, \texttt{GET /log} es inutilizable para cualquier caso de uso real (auditoría, búsqueda de una transacción específica, consulta de operaciones de un usuario).
+
+\subsection{Sin especificación OpenAPI ni versionado de API}
+
+\textbf{Archivos:} proyecto completo — ausencia de \texttt{openapi.yaml}/\texttt{swagger.json}, ausencia de prefijo \texttt{/v1/} en rutas. Solo existe una colección Postman (\texttt{doc/TP 1 - arVault.postman\_collection.json}) como documentación de la API.
+
+\textbf{Impacto sobre Interoperability ↓↓:} Sin un contrato machine-readable (OpenAPI), los equipos externos (apps mobile) deben derivar el comportamiento de la API a partir de la colección Postman o el README. Cualquier cambio en los endpoints o en la estructura de los JSONs es un breaking change silencioso que se descubre en runtime. No hay manera de generar clientes automáticamente ni validar la API contra su especificación.
+
+\textbf{Impacto sobre Usabilidad ↓:} La falta de documentación estructurada aumenta la fricción para los desarrolladores externos que deben integrar la API.
+
+\textbf{Impacto sobre Testability ↓:} Sin especificación formal no es posible usar herramientas de contract testing que verifiquen automáticamente que la implementación respeta el contrato.
+
+\section{Impacto de las Decisiones de Diseño sobre los QA}
+
+\subsection{Tabla resumen}
+
+% ============================================================
+% Tabla 1: Hasta Efficiency (5 columnas)
+% ============================================================
+\begingroup
+\renewcommand*{\arraystretch}{1.2}
+\setlength{\tabcolsep}{4pt}
+\begin{longtable}{@{}l|c|c|c|c@{}}
+\caption{Impacto de decisiones de diseño sobre los atributos de calidad (I): disponibilidad y rendimiento}\\
+\toprule
+\textbf{Decisión de diseño} & \textbf{Avail.} & \textbf{Perf. Red} & \textbf{Perf. UX} & \textbf{Efficiency} \\
+\midrule
+\endfirsthead
+\multicolumn{5}{c}{{\bfseries Tabla 1 (continuación)}} \\
+\toprule
+\textbf{Decisión de diseño} & \textbf{Avail.} & \textbf{Perf. Red} & \textbf{Perf. UX} & \textbf{Efficiency} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Persistencia JSON con save periódico & ↓↓ & — & — & ↓↓ \\
+Estado en memoria sin concurrencia & ↓ & — & ↓↓ & — \\
+\texttt{transfer()} mockeada secuencial & — & — & ↓↓ & ↓ \\
+Instancia única, sin réplicas & ↓↓↓ & — & ↓↓ & — \\
+Sin autenticación propia & — & — & — & — \\
+Sin instrumentación en la app & — & — & — & — \\
+HTTP 500 para errores de negocio & — & — & — & — \\
+Validación por falsiness & — & — & — & — \\
+Log ilimitado en memoria & ↓ & ↓↓ & ↓ & ↓↓ \\
+Sin OpenAPI / versionado & — & — & — & — \\
+Nginx upstream hardcodeado & ↓ & — & — & — \\
+\end{longtable}
+\endgroup
+
+\vspace{0.8cm}
+
+% ============================================================
+% Tabla 2: El resto de QA (8 columnas)
+% ============================================================
+\begingroup
+\renewcommand*{\arraystretch}{1.2}
+\setlength{\tabcolsep}{2.5pt}   % Espacio muy reducido para que quepan 8 columnas
+\footnotesize                    % Letra más pequeña
+\begin{longtable}{@{}l|c|c|c|c|c|c|c@{}}
+\caption{Impacto de decisiones de diseño sobre los atributos de calidad (II): escalabilidad, seguridad, mantenibilidad e integración}\\
+\toprule
+\textbf{Decisión de diseño} & \textbf{Scalab.} & \textbf{Security} & \textbf{Visibility} & \textbf{Testability} & \textbf{Portability} & \textbf{Interop.} & \textbf{Usability} \\
+\midrule
+\endfirsthead
+\multicolumn{8}{c}{{\bfseries Tabla 2 (continuación)}} \\
+\toprule
+\textbf{Decisión de diseño} & \textbf{Scalab.} & \textbf{Security} & \textbf{Visibility} & \textbf{Testability} & \textbf{Portability} & \textbf{Interop.} & \textbf{Usability} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Persistencia JSON con save periódico & ↓↓↓ & — & — & ↓ & — & — & — \\
+Estado en memoria sin concurrencia & — & — & — & ↓↓ & — & — & — \\
+\texttt{transfer()} mockeada secuencial & — & — & ↓↓ & ↓↓ & — & ↓↓ & — \\
+Instancia única, sin réplicas & ↓↓↓ & — & — & — & ↓ & — & — \\
+Sin autenticación propia & — & ↓↓↓ & — & — & — & ↓ & — \\
+Sin instrumentación en la app & — & — & ↓↓↓ & — & — & — & — \\
+HTTP 500 para errores de negocio & — & — & ↓↓ & — & — & — & ↓↓↓ \\
+Validación por falsiness & — & ↓ & — & ↓ & — & — & ↓↓ \\
+Log ilimitado en memoria & — & — & — & — & — & — & ↓ \\
+Sin OpenAPI / versionado & — & — & — & ↓ & — & ↓↓ & ↓ \\
+Nginx upstream hardcodeado & ↓↓ & — & — & — & ↓↓ & — & — \\
+\end{longtable}
+\endgroup

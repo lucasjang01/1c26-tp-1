@@ -13,3 +13,78 @@ Frente a este reclamo, \textbf{arVault} decide contratar a un grupo de arquitect
 
 El objetivo de este informe es presentar una evaluación de la arquitectura actual del servicio de cambio de monedas, identificar los atributos de calidad que se ven afectados (ver Apartado~\ref{sec:atributos-importantes}) por los reclamos de los usuarios, y proponer decisiones de diseño  que puedan mejorar dichos atributos (Apartado~\ref{sec:decisiones-de-diseño}). Además, se presentarán métricas en el Apartado~\ref{sec:metricas} para evaluar el impacto de las decisiones propuestas y se discutirán las conclusiones obtenidas a partir del análisis realizado. Finalmente, se incluirá una sección de conclusiones (Apartado~\ref{sec:conclusion}) que sintetice los hallazgos y recomendaciones para \textbf{arVault}.
 
+\subsection{Stack tecnológico}
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Componente} & \textbf{Tecnología} & \textbf{Versión} \\
+\midrule
+API REST & Node.js + Express & 22 / 4.21.2 \\
+Persistencia & Archivos JSON en disco & — \\
+Contenedores & Docker + Docker Compose & — \\
+Reverse proxy & Nginx & 1.29.8 \\
+Generación de carga & Artillery + plugin-statsd & 2.0.22 / 2.2.1 \\
+Métricas & StatsD + Graphite + Grafana & — / 1.1.10-5 / 11.5.10 \\
+Monitoreo de contenedores & cAdvisor & 0.51.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Topología de despliegue}
+
+\begin{verbatim}
+Cliente / Artillery (load generator)
+          |
+          v
+   +-------------+
+   |   Nginx     |  <- Reverse proxy, puerto 5555->80
+   |  (proxy)    |    upstream hardcodeado: exchange-api-1:3000
+   +------+------+
+          |
+          v
+   +-----------------------------------+
+   |   Node.js / Express (port 3000)   |  <- Unica instancia, sin replicas
+   |                                   |
+   |  app.js    <- routing/validacion |
+   |  exchange.js <- logica de negocio|  estado en memoria (variables globales)
+   |  state.js  <- persistencia       |  guarda cada 1-5 segundos
+   +----------------+------------------+
+                    |
+        +-----------+-----------+
+        v           v           v
+   accounts.json  rates.json  log.json   <- persistencia en disco
+\end{verbatim}
+
+\begin{verbatim}
+Stack de observabilidad (desacoplado de la app):
+
+Artillery --> StatsD --> Graphite <-- cAdvisor
+                              |
+                          Grafana
+                    (4 paneles: RPS, codigos HTTP,
+                     latencia cliente, CPU/memoria)
+\end{verbatim}
+
+\subsection{Patrón arquitectónico}
+
+Monolito de \textbf{tres capas} (controller → business logic → persistence) con \textbf{estado centralizado en memoria} y \textbf{persistencia eventual} en archivos JSON. No hay base de datos relacional, no hay cola de mensajes, no hay mecanismo de coordinación distribuida.
+
+\subsection{Endpoints disponibles}
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Método} & \textbf{Ruta} & \textbf{Descripción} \\
+\midrule
+\texttt{GET} & \texttt{/accounts} & Retorna cuentas internas de la empresa \\
+\texttt{PUT} & \texttt{/accounts/:id/balance} & Modifica el saldo de una cuenta interna \\
+\texttt{GET} & \texttt{/rates} & Retorna tasas de cambio vigentes \\
+\texttt{PUT} & \texttt{/rates} & Actualiza una tasa y calcula la recíproca \\
+\texttt{POST} & \texttt{/exchange} & Ejecuta una operación de cambio de monedas \\
+\texttt{GET} & \texttt{/log} & Retorna el historial de transacciones \\
+\bottomrule
+\end{tabular}
+\end{table}
