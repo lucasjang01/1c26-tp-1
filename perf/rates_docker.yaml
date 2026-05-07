@@ -1,0 +1,66 @@
+config:
+  environments:
+    api:
+      target: 'http://nginx:80'
+      plugins:
+        statsd:
+          host: graphite
+          port: 8125
+          prefix: "artillery-api"
+
+    load:
+      target: 'http://nginx:80'
+      plugins:
+        statsd:
+          host: graphite
+          port: 8125
+          prefix: "artillery-api"
+      phases:
+        - name: Ramp
+          duration: 120
+          arrivalRate: 1
+          rampTo: 20
+        - name: Sostenido
+          duration: 300
+          arrivalRate: 20
+
+    stress:
+      target: 'http://nginx:80'
+      plugins:
+        statsd:
+          host: graphite
+          port: 8125
+          prefix: "artillery-api"
+      phases:
+        - name: "10 rps"
+          duration: 120
+          arrivalRate: 10
+        - name: "25 rps"
+          duration: 120
+          arrivalRate: 25
+        - name: "50 rps"
+          duration: 120
+          arrivalRate: 50
+        - name: "100 rps"
+          duration: 120
+          arrivalRate: 100
+        - name: "200 rps"
+          duration: 120
+          arrivalRate: 200
+
+  pool: 50
+
+  phases:
+    - name: Ramp
+      duration: 30
+      arrivalRate: 1
+      rampTo: 5
+    - name: Plain
+      duration: 60
+      arrivalRate: 5
+
+scenarios:
+  - name: Rates (/rates)
+    flow:
+      - get:
+          url: '/rates'

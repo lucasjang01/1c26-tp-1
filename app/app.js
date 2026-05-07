@@ -23,14 +23,18 @@ app.get("/log", logController.getAll);
 app.post("/exchange", exchangeController.postExchange);
 
 // Ping/Echo (Bass, Availability - Detect Faults)
-app.get("/health", (req, res) => {
-  const accounts = getAccounts();
-  const rates = getRates();
-  const isReady = accounts !== undefined && rates !== undefined;
-  
-  res.status(isReady ? 200 : 503).json({
-    status: isReady ? "ok" : "initializing"
-  });
+app.get("/health", async (req, res) => {
+  try {
+    const accounts = await getAccounts();
+    const rates = await getRates();
+    const isReady = accounts !== undefined && rates !== undefined;
+
+    res.status(isReady ? 200 : 503).json({
+      status: isReady ? "ok" : "initializing",
+    });
+  } catch (err) {
+    res.status(503).json({ status: "initializing" });
+  }
 });
 
 app.listen(port, () => {
