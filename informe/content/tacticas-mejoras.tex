@@ -410,27 +410,6 @@ exchange-grafana-1     (running)    - Dashboard available @ localhost:80
 exchange-cadvisor-1    (running)    - Container metrics
 \end{verbatim}
 
-\subsubsection{Próximos Pasos}
-
-\paragraph{Inmediato}
-\begin{enumerate}[leftmargin=*]
-    \item Recolectar baseline POST-optimización en Grafana (spike test @ 20--50 req/s)
-    \item Ejecutar chaos-kill completo para medir MTTR real
-    \item Comparar P95/P99 latency antes vs después en spike workload
-\end{enumerate}
-
-\paragraph{Futuro}
-
-Las siguientes mejoras quedan documentadas para iteraciones posteriores:
-\begin{itemize}[leftmargin=*]
-    \item Redis caching para rates (reduce DB reads)
-    \item Connection pooling a DB (evita setup overhead)
-    \item Async transfer mock (liberar event loop)
-    \item API replication (2+ instancias con load balancer)
-    \item Rate limiting (prevenir overload)
-    \item Memory leak fix (unbounded log array)
-\end{itemize}
-
 \subsubsection{Métricas de Éxito}
 
 \paragraph{Paquete A: Detecta estado real}

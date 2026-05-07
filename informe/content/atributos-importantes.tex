@@ -1,59 +1,39 @@
 \section{Atributos Importantes}
 \label{sec:atributos-importantes}
 
-\subsubsection{Atributos de Calidad Clave}
+\subsection{Atributos de calidad clave}
 \label{subsec:qas-clave}
 
 Considerando la naturaleza financiera y transaccional del servicio provisto (\textit{arVault}, un \textit{exchange} de criptomonedas y dinero fiat), se han determinado como centrales los siguientes Atributos de Calidad (QAs):
 
-\begin{itemize}
-    \item \textbf{Seguridad (Security):} Al tratarse de una \textit{fintech} que opera saldos reales en múltiples monedas, la seguridad es el atributo mas critico. Si bien existe un componente externo que gestiona autenticación y autorización, hay aspectos de seguridad que recaen directamente sobre el servicio: la integridad de las transacciones, la prevención de condiciones de carrera que permitan operar con fondos insuficientes y la consistencia del estado financiero. Una brecha en este atributo tiene consecuencias legales, financieras y reputacionales inmediatas.
-    \item \textbf{Disponibilidad (Availability):} arVault ya sufrió caída de reputación y pérdida de inversores por problemas en el servicio de cambio. Para una billetera digital, la indisponibilidad equivale a pérdida de negocio y confianza de los usuarios. Este atributo es condición necesaria para la continuidad operativa de la empresa.
-    \item \textbf{Desempeño (Performance):} El diferencial de arVault es ofrecer la tasa de cambio más conveniente del mercado. Si las operaciones de \textit{exchange} presentan latencias elevadas, los usuarios perciben el servicio como poco confiable, especialmente en un contexto donde los tipos de cambio fluctúan en tiempo real. El sistema debe procesar múltiples operaciones concurrentes con un tiempo de respuesta adecuado y un alto nivel de \textit{throughput} bajo momentos de mayor demanda.
-    \item \textbf{Escalabilidad (Scalability):} La startup se encuentra en crecimiento activo, captando usuarios e inversores. La arquitectura original fue construida bajo la consigna \textit{fake it until you make it} y no fue diseñada para escalar. Previendo un escenario con cantidad creciente de usuarios operando simultáneamente, el servicio debe poder ser replicado horizontalmente para poder soportar la carga aumentada de usuarios.
-    \item \textbf{Usabilidad (Usability) --- tercerizado:} El fundador de arVault tercerizó el desarrollo de las aplicaciones móviles, por lo que la usabilidad del frontend queda fuera del alcance directo de este análisis. Se menciona por su importancia, pero no es objetivo de las tácticas a implementar en este trabajo.
-\end{itemize}
-
-\subsubsection{Availability (Disponibilidad)}
-
-\textbf{Justificación:} El servicio ya está en producción con usuarios activos. Un tiempo de inactividad tiene impacto directo en reputación, en las reviews negativas que motivan este análisis y en la confianza de los potenciales inversores. En fintech, los usuarios asocian la indisponibilidad del servicio con pérdida de dinero o acceso bloqueado a sus fondos, lo que amplifica el daño reputacional.
-
-\subsubsection{Performance}
-
-Performance se descompone en tres dimensiones diferenciadas para este servicio:
-
+\subsubsection{Seguridad (Security):} Al tratarse de una \textit{fintech} que opera saldos reales en múltiples monedas, la seguridad es el atributo más critico. Si bien existe un componente externo que gestiona autenticación y autorización, hay aspectos de seguridad que recaen directamente sobre el servicio: la integridad de las transacciones, la prevención de condiciones de carrera que permitan operar con fondos insuficientes y la consistencia del estado financiero. Una brecha en este atributo tiene consecuencias legales, financieras y reputacionales inmediatas. El servicio expone operaciones que modifican saldos reales y tasas de cambio que afectan a todos los usuarios. Sin autenticación ni autorización propias, cualquier actor con acceso de red puede manipular el estado financiero del sistema. Para los inversores que evalúan arVault, una brecha de seguridad evidente es un bloqueante.
+\subsubsection{Disponibilidad (Availability):} arVault ya sufrió caída de reputación y pérdida de inversores por problemas en el servicio de cambio. Para una billetera digital, la indisponibilidad equivale a pérdida de negocio y confianza de los usuarios. Este atributo es condición necesaria para la continuidad operativa de la empresa. El servicio ya está en producción con usuarios activos. Un tiempo de inactividad tiene impacto directo en reputación, en las reviews negativas que  motivan este análisis y en la confianza de los potenciales inversores. En fintech, los usuarios asocian la indisponibilidad del servicio con pérdida de dinero o acceso bloqueado a sus fondos, lo que amplifica el daño reputacional.
+\subsubsection{Desempeño (Performance):} El diferencial de arVault es ofrecer la tasa de cambio más conveniente del mercado. Si las operaciones de \textit{exchange} presentan latencias elevadas, los usuarios perciben el servicio como poco confiable, especialmente en un contexto donde los tipos de cambio fluctúan en tiempo real. El sistema debe procesar múltiples operaciones concurrentes con un tiempo de respuesta adecuado y un alto nivel de \textit{throughput} bajo momentos de mayor demanda. Performance se descompone en tres dimensiones diferenciadas para este servicio:
 \begin{itemize}[leftmargin=*]
     \item \textbf{2a — Network Performance:} Eficiencia en el uso de la red entre cliente y servidor (tamaño de respuestas, reutilización de conexiones, compresión).
     \item \textbf{2b — User-Perceived Performance:} Latencia observable por el usuario final desde que emite un request hasta que recibe respuesta. Es el QA de performance más crítico para la experiencia de usuario: determina si arVault se percibe como ``rápida'' o ``lenta''.
     \item \textbf{2c — Efficiency (Resource Efficiency):} Uso eficiente de CPU, memoria y I/O por parte del sistema. Impacta el costo de operación y la degradación del servicio bajo carga sostenida.
 \end{itemize}
+El diferencial de arVault es la mejor tasa de cambio del mercado. Si la experiencia es lenta, los usuarios prefieren competidores con tasas levemente peores pero mejor UX. Además, bajo carga concurrente, la ineficiencia del servicio puede amplificar otros problemas (race conditions, I/O blocking).
+\subsubsection{Escalabilidad (Scalability):} La startup se encuentra en crecimiento activo, captando usuarios e inversores. La arquitectura original fue construida bajo la consigna \textit{fake it until you make it} y no fue diseñada para escalar. Previendo un escenario con cantidad creciente de usuarios operando simultáneamente, el servicio debe poder ser replicado horizontalmente para poder soportar la carga aumentada de usuarios. Si arVault capta inversión y crece en usuarios, la arquitectura debe soportar mayor carga. La escalabilidad determina si el sistema puede crecer horizontalmente (más instancias) o solo verticalmente (máquina más grande). En un contexto de startup, la escalabilidad horizontal es más económica y resiliente.
+\subsubsection{Usabilidad (Usability):} El fundador de arVault tercerizó el desarrollo de las aplicaciones móviles, por lo que la usabilidad del frontend queda fuera del alcance directo de este análisis. Se menciona por su importancia, pero no es objetivo de las tácticas a implementar en este trabajo. Los consumidores directos de este servicio son las apps mobile desarrolladas externamente. Una API con semántica incorrecta, mensajes de error crípticos o comportamiento inconsistente obliga a los desarrolladores de las apps a escribir código defensivo complejo y dificulta el diagnóstico de problemas en el cliente.
 
-\textbf{Justificación general:} El diferencial de arVault es la mejor tasa de cambio del mercado. Si la experiencia es lenta, los usuarios prefieren competidores con tasas levemente peores pero mejor UX. Además, bajo carga concurrente, la ineficiencia del servicio puede amplificar otros problemas (race conditions, I/O blocking).
+\subsection{Otros atributos de calidad }
 
-\subsubsection{Scalability (Escalabilidad)}
+Además de los QAs clave, se identifican otros atributos que, aunque no son el foco principal de este trabajo, también son relevantes para la calidad general del sistema:
 
-\textbf{Justificación:} Si arVault capta inversión y crece en usuarios, la arquitectura debe soportar mayor carga. La escalabilidad determina si el sistema puede crecer horizontalmente (más instancias) o solo verticalmente (máquina más grande). En un contexto de startup, la escalabilidad horizontal es más económica y resiliente.
+\subsubsection{Visibilidad / Observabilidad (Visibility)}
 
-\subsubsection{Security (Seguridad)}
+Para diagnosticar los reclamos de usuarios y operar un servicio financiero con confianza, el equipo necesita saber en tiempo real qué está pasando dentro del sistema: tasas de error, latencias, volúmenes, estado de los saldos. Sin visibilidad, los problemas se descubren cuando los usuarios se quejan, no cuando ocurren.
 
-\textbf{Justificación:} El servicio expone operaciones que modifican saldos reales y tasas de cambio que afectan a todos los usuarios. Sin autenticación ni autorización propias, cualquier actor con acceso de red puede manipular el estado financiero del sistema. Para los inversores que evalúan arVault, una brecha de seguridad evidente es un bloqueante.
+\subsubsection{Testeabilidad (Testability)}
 
-\subsubsection{Visibility (Visibilidad / Observabilidad)}
+Sin tests automatizados, cada cambio en el código puede introducir regresiones que solo se descubren en producción. En un servicio que maneja dinero, la falta de testabilidad es un multiplicador de riesgo: no se puede verificar el comportamiento antes de desplegar.
 
-\textbf{Justificación:} Para diagnosticar los reclamos de usuarios y operar un servicio financiero con confianza, el equipo necesita saber en tiempo real qué está pasando dentro del sistema: tasas de error, latencias, volúmenes, estado de los saldos. Sin visibilidad, los problemas se descubren cuando los usuarios se quejan, no cuando ocurren.
+\subsubsection{Portabilidad (Portability)}
 
-\subsubsection{Testability (Testeabilidad)}
+La capacidad de desplegar el sistema en distintos entornos (desarrollo, staging, producción, CI/CD) sin modificar el código reduce la fricción operativa y previene el síndrome de ``funciona en mi máquina''. En una startup que itera rápido, esto es crítico para la velocidad de desarrollo.
 
-\textbf{Justificación:} Sin tests automatizados, cada cambio en el código puede introducir regresiones que solo se descubren en producción. En un servicio que maneja dinero, la falta de testabilidad es un multiplicador de riesgo: no se puede verificar el comportamiento antes de desplegar.
+\subsubsection{Interoperabilidad (Interoperability)}
 
-\subsubsection{Portability (Portabilidad)}
-
-\textbf{Justificación:} La capacidad de desplegar el sistema en distintos entornos (desarrollo, staging, producción, CI/CD) sin modificar el código reduce la fricción operativa y previene el síndrome de ``funciona en mi máquina''. En una startup que itera rápido, esto es crítico para la velocidad de desarrollo.
-
-\subsubsection{Interoperability (Interoperabilidad)}
-
-\textbf{Justificación:} El servicio de cambio no opera en aislamiento: depende de un servicio de transferencias externo (actualmente mockeado), necesita integrarse con vaultSec para autenticación, y eventualmente deberá conectarse con bancos reales. La interoperabilidad determina qué tan fácil es integrar, reemplazar o extender estas dependencias.
-
-\subsubsection{Usability (Usabilidad de la API)}
-
-\textbf{Justificación:} Los consumidores directos de este servicio son las apps mobile desarrolladas externamente. Una API con semántica incorrecta, mensajes de error crípticos o comportamiento inconsistente obliga a los desarrolladores de las apps a escribir código defensivo complejo y dificulta el diagnóstico de problemas en el cliente.
+El servicio de cambio no opera en aislamiento: depende de un servicio de transferencias externo (actualmente mockeado), necesita integrarse con vaultSec para autenticación, y eventualmente deberá conectarse con bancos reales. La interoperabilidad determina qué tan fácil es integrar, reemplazar o extender estas dependencias.

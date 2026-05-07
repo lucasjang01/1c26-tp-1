@@ -11,7 +11,7 @@ Frente a este reclamo, \textbf{arVault} decide contratar a un grupo de arquitect
 
 \subsection{Objetivo}
 
-El objetivo de este informe es presentar una evaluación de la arquitectura actual del servicio de cambio de monedas, identificar los atributos de calidad que se ven afectados (ver Apartado~\ref{sec:atributos-importantes}) por los reclamos de los usuarios, y proponer decisiones de diseño  que puedan mejorar dichos atributos (Apartado~\ref{sec:decisiones-de-diseño}). Además, se presentarán métricas en el Apartado~\ref{sec:metricas} para evaluar el impacto de las decisiones propuestas y se discutirán las conclusiones obtenidas a partir del análisis realizado. Finalmente, se incluirá una sección de conclusiones (Apartado~\ref{sec:conclusion}) que sintetice los hallazgos y recomendaciones para \textbf{arVault}.
+El objetivo de este informe es presentar una evaluación de la arquitectura actual del servicio de cambio de monedas, identificar los atributos de calidad que se ven afectados por los reclamos de los usuarios, y proponer decisiones de diseño  que puedan mejorar dichos atributos. Además, se presentarán pruebas y métricas en el para evaluar el impacto de las decisiones propuestas y se discutirán las conclusiones obtenidas a partir del análisis realizado. Finalmente, se incluirá una sección de conclusiones que sintetice los hallazgos y recomendaciones para \textbf{arVault}.
 
 \subsection{Stack tecnológico}
 
@@ -34,6 +34,13 @@ Monitoreo de contenedores & cAdvisor & 0.51.0 \\
 
 \subsection{Topología de despliegue}
 
+\begin{center}
+\begin{tcolorbox}[
+  breakable,
+  colback=white,
+  colframe=black,
+  boxrule=0.5pt
+]
 \begin{verbatim}
 Cliente / Artillery (load generator)
           |
@@ -47,15 +54,19 @@ Cliente / Artillery (load generator)
    +-----------------------------------+
    |   Node.js / Express (port 3000)   |  <- Unica instancia, sin replicas
    |                                   |
-   |  app.js    <- routing/validacion |
-   |  exchange.js <- logica de negocio|  estado en memoria (variables globales)
-   |  state.js  <- persistencia       |  guarda cada 1-5 segundos
+   |  app.js    <- routing/validacion  |
+   |  exchange.js <- logica de negocio |  estado en memoria (variables globales)
+   |  state.js  <- persistencia        |  guarda cada 1-5 segundos
    +----------------+------------------+
                     |
         +-----------+-----------+
         v           v           v
    accounts.json  rates.json  log.json   <- persistencia en disco
 \end{verbatim}
+\end{tcolorbox}
+\captionof{diagrama}{Arquitectura primera del servicio.}
+\label{diag:monolito_1}
+\end{center}
 
 \begin{verbatim}
 Stack de observabilidad (desacoplado de la app):

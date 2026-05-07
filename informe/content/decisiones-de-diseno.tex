@@ -19,66 +19,66 @@ Además, el \textbf{API Server} mezcla responsabilidades: realiza validación de
 La arquitectura propuesta introduce una separación en capas con responsabilidades bien delimitadas. El \textbf{API Server} delega cada request a uno de cuatro controladores especializados: \textbf{Account Controller}, \textbf{Rate Controller}, \textbf{Exchange Controller} y \textbf{Log Controller}, que se encargan exclusivamente de la validación de input y el mapeo de respuestas HTTP. Cada controlador invoca a su correspondiente servicio de dominio (\textbf{Account Service}, \textbf{Rate Service}, \textbf{Exchange Service} y \textbf{Log Service}), donde reside la lógica de negocio. Los servicios acceden al estado únicamente a través de repositorios (\textbf{Account Repository}, \textbf{Rate Repository}, \textbf{Log Repository}), que exponen interfaces limpias y son los únicos componentes autorizados a interactuar con el \textbf{State Manager}. Este último centraliza toda la lectura y escritura a disco, persistiendo el estado en \texttt{accounts.json}, \texttt{rates.json} y \texttt{log.json}.
 
 \begin{center}
-\includegraphics[width=\textwidth]{images/new component and connectors.png}
+\includegraphics[width=12cm]{images/new component and connectors.png}
 \captionof{diagrama}{Arquitectura luego de la mejora}
 \label{diag:arquitectura_monolito_despues}
 \end{center}
 
 \subsubsection{Atributos de calidad afectados}
 
-\subsubsection{Testability}
+\paragraph{Testability}
 Es el atributo más beneficiado por este cambio. En la arquitectura original, testear el \textbf{Exchange Service} implicaba activar toda la cadena de componentes, ya que no había separación entre lógica de negocio, acceso a datos y manejo de estado. En la nueva arquitectura, cada capa puede probarse de forma aislada: los Controllers pueden testearse con mocks de los Services, los Services con mocks de los Repositories, y los Repositories con mocks del \textbf{State Manager}. Esto permite pruebas unitarias verdaderas y facilita la detección temprana de bugs.
 
-\subsubsection{Maintainability}
+\paragraph{Maintainability}
 También mejora considerablemente. La separación por capas y por responsabilidades hace que encontrar a nivel de código dónde está cada cosa sea más fácil e intuitivo, sin tener que recorrer código ajeno a lo que se busca. Si surge un bug, el patrón establecido lo hace directo de encontrar; cada feature nuevo sigue la misma estructura.
 
-\subsubsection{Modifiability}
+\paragraph{Modifiability}
 El cambio tiene un impacto positivo significativo. Con la arquitectura anterior, agregar un nuevo dominio o modificar uno existente podía requerir alterar componentes compartidos como el \textbf{Exchange Service}, propagando el riesgo de cambio por toda la cadena. En la nueva arquitectura, cada dominio es una columna vertical independiente (\textbf{Controller} $\rightarrow$ \textbf{Service} $\rightarrow$ \textbf{Repository}), de modo que agregar un nuevo dominio implica simplemente agregar una nueva columna sin tocar las existentes. Del mismo modo, cambiar la fuente de datos de los logs, por ejemplo, solo requiere modificar el \textbf{Log Repository}, sin afectar al \textbf{Log Service} ni al \textbf{Log Controller}. Esto reduce el costo y el riesgo de cada modificación futura.
 
-\subsubsection{Performance (atributo afectado negativamente)}
-Si bien en teoría la nueva arquitectura introduce más niveles de indirección y por lo tanto podría esperarse un impacto negativo en la latencia, en la práctica las métricas no mostraron diferencias significativas respecto a la arquitectura anterior, o las diferencias registradas fueron lo suficientemente pequeñas como para considerarse despreciables. El overhead generado por los saltos adicionales entre capas no se tradujo en una degradación observable del sistema.\subsection{Persistencia lazy}
+\paragraph{Performance (atributo afectado negativamente)}
+Si bien en teoría la nueva arquitectura introduce más niveles de indirección y por lo tanto podría esperarse un impacto negativo en la latencia, en la práctica las métricas no mostraron diferencias significativas respecto a la arquitectura anterior, o las diferencias registradas fueron lo suficientemente pequeñas como para considerarse despreciables. El overhead generado por los saltos adicionales entre capas no se tradujo en una degradación observable del sistema.
 
-El estado se guarda a disco cada 1-5 segundos en lugar de en cada operación. Simplifica el código y no bloquea requests con I/O, pero si el proceso muere entre guardados se pierden transacciones, violación de durabilidad.
+\subsection{Variables en memoria}
 
-\subsubsection{Mejora propuesta}
-
-Con la incorporacion de Redis, decidimos remover la persistencia lazy a disco. Redis se encarga de la durabilidad y persistencia de los datos, eliminando el riesgo de pérdida de transacciones en caso de caída del proceso.
-
-\subsubsection{Atributos de calidad afectados}
-
-\subsubsection{Durability}
-La ventana de pérdida de datos que generaba el guardado cada 1-5 segundos desaparece. Si el proceso muere, las transacciones están garantizadas porque Redis las persistió antes de confirmarlas.
-
-\subsubsection{Performance}
-Dependiendo del nivel de durabilidad que se configure en Redis, puede agregarse algo de latencia por operación. Es un costo generalmente aceptable frente a la garantía que ofrece, pero es un trade-off que hay que tener en cuenta.
-
-\subsection{Persistencia en archivos json}
-
-Todo vive en archivos JSON locales. Sin transacciones atómicas, sin estado compartible entre instancias, y con riesgo de corrupción si el archivo falla.
+Accounts, rates y log son variables JavaScript dentro del proceso. Leer es instantáneo (bueno para \textit{performance}), pero hace imposible escalar horizontalmente porque cada instancia tendría su propio estado desincronizado.
 
 \subsubsection{Mejora propuesta}
 
-Con la incorporación de Redis, se reemplazó completamente la persistencia en archivos JSON por un almacenamiento centralizado. Esto resuelve los problemas de falta de transacciones atómicas, imposibilidad de compartir estado entre instancias y riesgo de corrupción.
-
-\subsubsection{Atributos de calidad afectados}
-
-\subsubsection{Reliability}
-El riesgo de corrupción de archivos ya no está. Redis maneja la integridad de los datos de forma mucho más robusta que un archivo JSON que puede quedar en estado inconsistente si el proceso muere en medio de una escritura.
-
-\subsubsection{Availability}
-El sistema ahora depende de Redis como infraestructura adicional que hay que operar y monitorear. Si Redis no está disponible el sistema no funciona, introduciendo un nuevo punto de falla que antes no existía.\subsubsection{Mejora propuesta}
-
-Con Redis como estado compartido y Nginx reconfigurado para balancear carga, el \textbf{API Server} pasa de ser una instancia única a poder escalar horizontalmente ($1..*$). Nginx distribuye los requests entre las réplicas disponibles, eliminando el SPOF y permitiendo absorber mayor carga concurrente.
+Se incorporó Redis como almacenamiento centralizado. El estado deja de vivir dentro del proceso y pasa a una fuente de verdad única y compartida entre todas las instancias, eliminando la desincronización.
 
 \begin{center}
-\includegraphics[width=\textwidth]{images/multiple instances component and connectors.png}
-\captionof{diagrama}{El único cambio respecto al diagrama anterior es la multiplicidad $1..*$ entre \textbf{Nginx} y la aplicación: ahora pueden existir múltiples instancias, cada una con su propia cadena de Controllers, Services y Repositories, todas compartiendo el mismo estado en Redis.}
-\label{diag:arquitectura_multiple_instancias}
+\includegraphics[width=\textwidth]{images/redis component and connectors.png}
+\captionof{diagrama}{Arquitectura con Redis como almacenamiento centralizado. Las tres decisiones de diseño que siguen —variables en memoria, persistencia lazy y persistencia en archivos JSON— fueron resueltas todas juntas mediante la incorporación de Redis. El \textbf{State Manager} ya no persiste en archivos locales sino que delega en Redis, que actúa como fuente de verdad única y compartida entre todas las instancias.}
+\label{diag:arquitectura_redis}
 \end{center}
 
-\subsection{Persistencia en archivos JSON con guardado periódico}
+\subsubsection{Atributos de calidad afectados}
 
-\textbf{Archivos:} \texttt{app/state.js:16–23}, \texttt{app/state.js:55–68}
+\paragraph{Scalability}
+El atributo más impactado. Antes era imposible levantar múltiples instancias porque cada una tendría su propio estado desincronizado; con Redis esto queda resuelto.
+
+\paragraph{Performance (atributo afectado negativamente)}
+Leer una variable en memoria es instantáneo, mientras que cada operación contra Redis implica una llamada de red. En la práctica esta latencia suele ser de un par de milisegundos y resulta aceptable, pero es un costo real que antes no existía. En nuestras pruebas la diferencia en performance era despreciable, por lo que el trade-off entre escalabilidad y latencia es favorable.
+
+\subsection{Persistencia lazy}
+
+El estado se guarda a disco cada 1-5 segundos en lugar de en cada operación. Simplifica el código y no bloquea requests con I/O, pero si el proceso muere entre guardados se pierden transacciones, violando la durabilidad.
+
+\subsubsection{Mejora propuesta}
+
+Con la incorporación de Redis se removió la persistencia lazy a disco. Redis se encarga de la durabilidad y persistencia de los datos, eliminando la ventana de pérdida de transacciones en caso de caída del proceso.
+
+\subsubsection{Atributos de calidad afectados}
+
+\paragraph{Durability}
+La ventana de pérdida de datos que generaba el guardado cada 1-5 segundos desaparece. Si el proceso muere, las transacciones están garantizadas porque Redis las persistió antes de confirmarlas.
+
+\paragraph{Performance}
+Dependiendo del nivel de durabilidad configurado en Redis, puede agregarse algo de latencia por operación. Es un costo generalmente aceptable frente a la garantía que ofrece, pero es un trade-off a tener en cuenta.
+
+\subsection{Persistencia en archivos JSON}
+
+\textbf{Archivos:} \texttt{app/state.js:16--23}, \texttt{app/state.js:55--68}
 
 \begin{verbatim}
 // Carga inicial desde disco
@@ -92,53 +92,28 @@ scheduleSave(rates,    RATES,    5000);  // cada 5 segundos
 scheduleSave(log,      LOG,      1000);  // cada 1 segundo
 \end{verbatim}
 
-El estado vive en memoria y se persiste asíncronamente en intervalos regulares. No hay escritura atómica (se usa \texttt{writeFile} directamente, sin write-to-temp-then-rename).
+Todo el estado vive en archivos JSON locales. No hay escritura atómica (se usa \texttt{writeFile} directamente, sin write-to-temp-then-rename), no hay transacciones atómicas, el array \texttt{log} crece ilimitadamente (\texttt{exchange.js:108}) y es imposible compartir estado entre instancias.
 
-\textbf{Impacto sobre Availability ↓↓:} Un crash durante \texttt{writeFile} (por ejemplo, disco lleno o SIGKILL) deja el archivo JSON parcialmente escrito. Al reiniciar, \texttt{JSON.parse} lanza una excepción en \texttt{state.js:45} y el servicio no puede cargar su estado, quedando inutilizable hasta intervención manual.
+\subsubsection{Mejora propuesta}
 
-\textbf{Impacto sobre Efficiency ↓↓:} El array \texttt{log} crece ilimitadamente (\texttt{exchange.js:108}). \texttt{scheduleSave} serializa el array completo cada 1 segundo mediante \texttt{JSON.stringify}. Con alta carga sostenida, esta operación escala linealmente en CPU y tiempo, compitiendo con el procesamiento de requests.
+Con la incorporación de Redis se reemplazó completamente la persistencia en archivos JSON por un almacenamiento centralizado. Esto resuelve la falta de transacciones atómicas, la imposibilidad de compartir estado entre instancias y el riesgo de corrupción.
 
-\textbf{Impacto sobre Scalability ↓↓↓:} Es arquitecturalmente imposible correr más de una réplica simultánea de la API. Dos procesos escribiendo el mismo \texttt{accounts.json} en simultáneo producirían corrupción de datos sin ningún mecanismo de coordinación (no hay locking de archivo, no hay transacciones). Este es el principal bloqueante para escalar horizontalmente.
+\subsubsection{Atributos de calidad afectados}
 
-\textbf{Impacto sobre Testability ↓:} Los tests de integración deben preparar y limpiar archivos JSON en disco. No hay interfaz para inyectar estado en memoria sin tocar el filesystem.
+\paragraph{Availability}
+Un crash durante \texttt{writeFile} (por ejemplo, disco lleno o SIGKILL) dejaba el archivo JSON parcialmente escrito. Al reiniciar, \texttt{JSON.parse} lanzaba una excepción en \texttt{state.js:45} y el servicio quedaba inutilizable hasta intervención manual. Con Redis este riesgo desaparece, aunque se introduce una nueva dependencia de infraestructura: si Redis no está disponible, el sistema tampoco funciona.
 
-\subsection{Estado en memoria sin control de concurrencia (race condition TOCTOU)}
+\paragraph{Reliability}
+El riesgo de corrupción de archivos ya no existe. Redis maneja la integridad de los datos de forma mucho más robusta que un archivo JSON que puede quedar en estado inconsistente si el proceso muere en medio de una escritura. Adicionalmente, Redis permite operaciones atómicas, eliminando la \textit{race condition} TOCTOU del doble gasto donde dos requests concurrentes podían leer el mismo balance y pasar ambas el check de fondos simultáneamente.
 
-\textbf{Archivo:} \texttt{app/exchange.js:81–105}
+\paragraph{Efficiency}
+El array \texttt{log} crecía ilimitadamente y \texttt{scheduleSave} serializaba el array completo cada 1 segundo mediante \texttt{JSON.stringify}. Con alta carga sostenida, esta operación escalaba linealmente en CPU y tiempo, compitiendo con el procesamiento de requests. Redis elimina este problema.
 
-\begin{verbatim}
-// CHECK: se verifica el saldo disponible
-if (counterAccount.balance >= counterAmount) {
-  // PAUSA asíncrona: ~200–400 ms (primera transferencia)
-  if (await transfer(clientBaseAccountId, baseAccount.id, baseAmount)) {
-    // PAUSA asíncrona: ~200–400 ms (segunda transferencia)
-    if (await transfer(counterAccount.id, clientCounterAccountId, counterAmount)) {
-      // USE: recién aquí se descuenta el saldo
-      counterAccount.balance -= counterAmount;  // exchange.js:90
-\end{verbatim}
+\paragraph{Scalability}
+Era arquitecturalmente imposible correr más de una réplica simultánea de la API: dos procesos escribiendo el mismo \texttt{accounts.json} en simultáneo producirían corrupción sin ningún mecanismo de coordinación. Con Redis como fuente de verdad es posible escalar horizontalmente agregando mas instancias de la API, todas compartiendo el mismo estado.
 
-El chequeo de saldo (línea 81) y la actualización (línea 90) están separados por hasta 800 ms de operaciones asíncronas. Durante ese intervalo, el event loop de Node.js puede procesar otros requests entrantes, todos los cuales leen el saldo sin modificar.
-
-\textbf{Escenario de explotación bajo concurrencia:}
-
-\begin{verbatim}
-Saldo inicial counterAccount (USD): 600
-Request A: counterAmount = 500
-Request B: counterAmount = 500
-
-t=0ms    Request A: 600 >= 500 -> true  (CHECK pasa)
-t=0ms    Request B: 600 >= 500 -> true  (CHECK pasa, A aún no debitó)
-t=400ms  Request A completa transfers -> saldo = 600 - 500 = 100
-t=400ms  Request B completa transfers -> saldo = 100 - 500 = -400  <- SALDO NEGATIVO
-\end{verbatim}
-
-Ambas operaciones se registran como \texttt{ok: true}. El servicio emite fondos que no posee.
-
-\textbf{Impacto sobre User-Perceived Performance ↓↓:} Bajo carga concurrente, todos los requests de \texttt{POST /exchange} están activos simultáneamente esperando sus \texttt{await transfer()}. El tiempo de respuesta percibido por el usuario no es solo el de su request, sino el de todos los que compiten en el event loop.
-
-\textbf{Impacto sobre Availability ↓:} Si el saldo llega a negativo, las siguientes operaciones legítimas que debieran ser exitosas pueden fallar erróneamente (el sistema cree que no tiene fondos cuando en realidad los tiene en otra moneda). Esto puede derivar en un estado del que el servicio no se recupera sin intervención.
-
-\textbf{Impacto sobre Testability ↓↓:} La race condition es difícil de reproducir en tests unitarios porque depende del timing del event loop. Requeriría tests de concurrencia específicos que el proyecto no tiene infraestructura para ejecutar.
+\paragraph{Testability}
+Los tests de integración debían preparar y limpiar archivos JSON en disco. Con Redis es posible inyectar estado sin tocar el filesystem, simplificando el setup de tests.
 
 \subsection{Función \texttt{transfer()} mockeada de forma secuencial}
 
@@ -155,15 +130,17 @@ async function transfer(fromAccountId, toAccountId, amount) {
 
 La función ignora todos sus parámetros y siempre resuelve \texttt{true} tras un delay aleatorio de 200–400 ms. Las dos llamadas en \texttt{exchange()} son \textbf{secuenciales} (líneas 83 y 86: la segunda \texttt{await} comienza solo cuando la primera termina).
 
-\textbf{Impacto sobre User-Perceived Performance ↓↓:} Cada \texttt{POST /exchange} consume un mínimo garantizado de 400 ms y un máximo de \(\sim\)800 ms solo en espera de transfers, antes de cualquier procesamiento. Bajo carga, los requests se encolan en el event loop y la latencia percibida crece linealmente.
+\subsubsection{Atributos de calidad afectados}
 
-\textbf{Impacto sobre Efficiency ↓:} Las dos llamadas podrían ser paralelas (\texttt{Promise.all}) sin afectar la corrección del flujo, reduciendo la latencia mínima a 200–400 ms. La decisión de hacerlas secuenciales duplica innecesariamente el tiempo de espera.
+\paragraph{User-Perceived Performance} ↓↓: Cada \texttt{POST /exchange} consume un mínimo garantizado de 400 ms y un máximo de \(\sim\)800 ms solo en espera de transfers, antes de cualquier procesamiento. Bajo carga, los requests se encolan en el event loop y la latencia percibida crece linealmente.
 
-\textbf{Impacto sobre Visibility ↓↓:} Las métricas de latencia del dashboard de Grafana reflejan estos 400–800 ms artificiales. Cuando se integre el servicio real de transferencias, las métricas históricas no serán comparables ni útiles como baseline.
+\paragraph{Efficiency} ↓ Las dos llamadas podrían ser paralelas (\texttt{Promise.all}) sin afectar la corrección del flujo, reduciendo la latencia mínima a 200–400 ms. La decisión de hacerlas secuenciales duplica innecesariamente el tiempo de espera.
 
-\textbf{Impacto sobre Testability ↓↓:} El camino de falla de la segunda transferencia (rollback en línea 95) nunca se ejecuta porque \texttt{transfer()} nunca falla. Ese código existe pero no ha sido testeado. Su corrección bajo condiciones reales es desconocida.
+\paragraph{Visibility} ↓↓ Las métricas de latencia del dashboard de Grafana reflejan estos 400–800 ms artificiales. Cuando se integre el servicio real de transferencias, las métricas históricas no serán comparables ni útiles como baseline.
 
-\textbf{Impacto sobre Interoperability ↓↓:} No existe contrato definido para el servicio de transferencias real. No hay interfaz, tipo de retorno especificado ni manejo de errores diseñado para el caso donde la transferencia falla parcialmente. La integración futura deberá rediseñar esta parte del flujo.
+\paragraph{Testability} ↓↓ El camino de falla de la segunda transferencia (rollback en línea 95) nunca se ejecuta porque \texttt{transfer()} nunca falla. Ese código existe pero no ha sido testeado. Su corrección bajo condiciones reales es desconocida.
+
+\paragraph{Interoperability} ↓↓ No existe contrato definido para el servicio de transferencias real. No hay interfaz, tipo de retorno especificado ni manejo de errores diseñado para el caso donde la transferencia falla parcialmente. La integración futura deberá rediseñar esta parte del flujo.
 
 \subsection{Instancia única sin redundancia ni healthcheck}
 
@@ -310,6 +287,12 @@ Ordenadas por costo de implementación:
     \item \textbf{Múltiples réplicas + state externalizado (Redis)} para escalado horizontal real. Es la solución definitiva pero requiere refactorizar \texttt{state.js} para eliminar el estado en memoria por proceso.
 \end{enumerate}
 
+\begin{center}
+\includegraphics[width=12cm]{images/multiple instances component and connectors.png}
+\captionof{diagrama}{El único cambio respecto al diagrama anterior es la multiplicidad $1..*$ entre \textbf{Nginx} y la aplicación: ahora pueden existir múltiples instancias, cada una con su propia cadena de Controllers, Services y Repositories, todas compartiendo el mismo estado en Redis.}
+\label{diag:arquitectura_multiple_instancias}
+\end{center}
+
 Las tácticas 1–4 son mejoras quirúrgicas con impacto inmediato sobre Availability y Performance. La táctica 6 es la única que escala Scalability más allá de un solo nodo, pero está bloqueada por la decisión 3.1 (persistencia en JSON local).
 
 \subsubsection{Resumen de impacto sobre QA}
@@ -330,38 +313,6 @@ Testability & ↓ & Sin endpoint de health, los tests smoke post-deploy no tiene
 \bottomrule
 \end{tabular}
 \end{table}
-
-\subsection{Sin autenticación ni autorización propias}
-
-\textbf{Archivo:} \texttt{app/README.md:5}
-
-\begin{verbatim}
-Este servicio no maneja seguridad, eso lo resuelve vaultSec, para cuando llega al nginx,
-el request está autenticado y autorizado. TODO: replicar vaultSec!!!
-\end{verbatim}
-
-\texttt{vaultSec} no existe en este repositorio ni aparece en \texttt{docker-compose.yml}. En el estado actual, cualquier cliente que alcance el puerto 5555 tiene acceso irrestricto a todas las operaciones.
-
-\textbf{Impacto sobre Security ↓↓↓:}
-
-\begin{table}[H]
-\centering
-\begin{tabular}{ll}
-\toprule
-\textbf{Endpoint} & \textbf{Riesgo sin autenticación} \\
-\midrule
-\texttt{GET /accounts} & Expone los saldos internos de la empresa \\
-\texttt{PUT /accounts/:id/balance} & Permite fijar cualquier saldo arbitrariamente \\
-\texttt{PUT /rates} & Permite manipular las tasas de cambio para todos los usuarios \\
-\texttt{POST /exchange} & Permite ejecutar cambios con cuentas de cualquier usuario \\
-\texttt{GET /log} & Expone el historial completo de operaciones financieras \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-No hay HTTPS configurado en el stack (Nginx escucha en HTTP plano), por lo que las credenciales y datos financieros viajan sin cifrar por la red.
-
-\textbf{Impacto sobre Interoperability ↓:} Sin un esquema de autenticación definido (JWT, API keys, OAuth), las apps mobile externas no pueden integrarse de forma segura. El contrato de seguridad entre el cliente y el servicio es indefinido.
 
 \subsection{Sin instrumentación en la aplicación}
 
@@ -422,11 +373,13 @@ La validación verifica únicamente que los campos no sean falsy en JavaScript (
     \item El mensaje de error ``Malformed request'' no indica qué campo falta o tiene formato incorrecto.
 \end{enumerate}
 
-\textbf{Impacto sobre Security ↓:} La ausencia de validación de rango y tipo permite producir estados inválidos mediante inputs deliberadamente malformados (montos negativos, divisas inexistentes).
+\subsubsection{Atributos de calidad afectados}
 
-\textbf{Impacto sobre Usabilidad ↓↓:} Los mensajes de error no son accionables para el desarrollador de la app mobile. ``Malformed request'' no dice qué campo es el problema. El crash por TypeError retorna 500, haciendo indistinguible un error de validación de un error del servidor.
+\paragraph{Security} ↓ La ausencia de validación de rango y tipo permite producir estados inválidos mediante inputs deliberadamente malformados (montos negativos, divisas inexistentes).
 
-\textbf{Impacto sobre Testability ↓:} El comportamiento inconsistente (algunos inputs inválidos retornan 400, otros producen 500 por TypeError) hace difícil escribir tests de validación exhaustivos.
+\paragraph{Usabilidad} ↓↓ Los mensajes de error no son accionables para el desarrollador de la app mobile. ``Malformed request'' no dice qué campo es el problema. El crash por TypeError retorna 500, haciendo indistinguible un error de validación de un error del servidor.
+
+\paragraph{Testability} ↓ El comportamiento inconsistente (algunos inputs inválidos retornan 400, otros producen 500 por TypeError) hace difícil escribir tests de validación exhaustivos.
 
 \subsection{Log de transacciones ilimitado en memoria}
 
@@ -438,27 +391,20 @@ scheduleSave(log, LOG, 1000);       // state.js:23 — serializa el array comple
 \end{verbatim}
 \texttt{GET /log} retorna el array completo sin paginación ni filtros.
 
-\textbf{Impacto sobre Network Performance ↓↓:} El payload de \texttt{GET /log} crece linealmente con el número de transacciones. En producción con carga sostenida, una respuesta que inicialmente pesa kilobytes puede llegar a megabytes, saturando el ancho de banda del cliente y el tiempo de serialización del servidor.
 
-\textbf{Impacto sobre Efficiency ↓↓:} \texttt{JSON.stringify(log)} ejecutado cada 1 segundo consume CPU y tiempo proporcional al tamaño del array. Con millones de entradas, esta operación compite activamente con el procesamiento de requests, degradando la latencia del sistema completo.
+\subsubsection{Atributos de calidad afectados}
 
-\textbf{Impacto sobre Availability ↓:} El crecimiento ilimitado del array en memoria puede eventualmente agotar el heap de Node.js. Cuando el proceso supera el límite de memoria del contenedor (sin límite configurado en docker-compose.yml), el OS lo termina y el servicio se reinicia, perdiendo el estado en memoria no persistido.
+\paragraph{Network Performance} ↓↓ El payload de \texttt{GET /log} crece linealmente con el número de transacciones. En producción con carga sostenida, una respuesta que inicialmente pesa kilobytes puede llegar a megabytes, saturando el ancho de banda del cliente y el tiempo de serialización del servidor.
 
-\textbf{Impacto sobre Usabilidad ↓:} Sin paginación ni filtros, \texttt{GET /log} es inutilizable para cualquier caso de uso real (auditoría, búsqueda de una transacción específica, consulta de operaciones de un usuario).
+\paragraph{Efficiency} ↓↓ \texttt{JSON.stringify(log)} ejecutado cada 1 segundo consume CPU y tiempo proporcional al tamaño del array. Con millones de entradas, esta operación compite activamente con el procesamiento de requests, degradando la latencia del sistema completo.
 
-\subsection{Sin especificación OpenAPI ni versionado de API}
+\paragraph{Availability} ↓ El crecimiento ilimitado del array en memoria puede eventualmente agotar el heap de Node.js. Cuando el proceso supera el límite de memoria del contenedor (sin límite configurado en docker-compose.yml), el OS lo termina y el servicio se reinicia, perdiendo el estado en memoria no persistido.
 
-\textbf{Archivos:} proyecto completo — ausencia de \texttt{openapi.yaml}/\texttt{swagger.json}, ausencia de prefijo \texttt{/v1/} en rutas. Solo existe una colección Postman (\texttt{doc/TP 1 - arVault.postman\_collection.json}) como documentación de la API.
+\paragraph{Usabilidad} ↓ Sin paginación ni filtros, \texttt{GET /log} es inutilizable para cualquier caso de uso real (auditoría, búsqueda de una transacción específica, consulta de operaciones de un usuario).
 
-\textbf{Impacto sobre Interoperability ↓↓:} Sin un contrato machine-readable (OpenAPI), los equipos externos (apps mobile) deben derivar el comportamiento de la API a partir de la colección Postman o el README. Cualquier cambio en los endpoints o en la estructura de los JSONs es un breaking change silencioso que se descubre en runtime. No hay manera de generar clientes automáticamente ni validar la API contra su especificación.
+\subsection{Impacto de las Decisiones de Diseño sobre los QA}
 
-\textbf{Impacto sobre Usabilidad ↓:} La falta de documentación estructurada aumenta la fricción para los desarrolladores externos que deben integrar la API.
-
-\textbf{Impacto sobre Testability ↓:} Sin especificación formal no es posible usar herramientas de contract testing que verifiquen automáticamente que la implementación respeta el contrato.
-
-\section{Impacto de las Decisiones de Diseño sobre los QA}
-
-\subsection{Tabla resumen}
+\subsubsection{Tabla resumen}
 
 % ============================================================
 % Tabla 1: Hasta Efficiency (5 columnas)
