@@ -949,6 +949,99 @@ El comportamiento es dominado por el \texttt{exchange} bajo carga. El mix muestr
 
 \textbf{Paneles recomendados:} ``Mixed - Requests / sec'', ``Mixed - Response time (p95/p99)'', ``Errors by endpoint'', ``Host CPU/Mem''.
 
+\subsection{Métricas de Negocio: Volumen Operado y Neto por Moneda}
+\label{subsec:metricas-negocio}
+
+En la sección \ref{sec:pruebas} se identificó como pendiente la instrumentación de la aplicación con métricas propias. Como parte de la iteración de mejora, se implementaron \textbf{métricas de negocio} que permiten observar el comportamiento del servicio de cambio desde la perspectiva del dominio, complementando las métricas de infraestructura (Artillery, cAdvisor).
+
+\subsubsection{Implementación}
+
+Se agregó el cliente \texttt{hot-shots} (librería StatsD canónica para Node.js) a la aplicación, con prefijo \texttt{app}. La instrumentación se integró dentro de \texttt{exchangeService.js}, emitiendo métricas únicamente en exchanges exitosos (resultado \texttt{ok: true}).
+
+\begin{verbatim}
+// app/utils/stats.js
+import StatsD from 'hot-shots';
+
+const statsd = new StatsD({
+  host: process.env.STATSD_HOST || '127.0.0.1',
+  port: 8125,
+  prefix: 'app.',
+});
+
+export default statsd;
+\end{verbatim}
+
+Dentro del handler de exchange, al confirmar una operación exitosa:
+
+\begin{verbatim}
+statsd.gauge(`exchange.volume.operated.${currency}`, volumes.operated[currency]);
+statsd.gauge(`exchange.volume.net.${currency}`,     volumes.net[currency]);
+\end{verbatim}
+
+\subsubsection{Métricas emitidas}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lp{5.5cm}l}
+\toprule
+\textbf{Métrica} & \textbf{Descripción} & \textbf{Tipo} \\
+\midrule
+\texttt{app.exchange.volume.operated.\{currency\}} & Volumen acumulado operado en la moneda, sin distinguir dirección. Suma de todos los \texttt{baseAmount} y \texttt{counterAmount} involucrados. & gauge \\
+\texttt{app.exchange.volume.net.\{currency\}} & Volumen neto por moneda: compras menos ventas. Refleja la posición neta del servicio en cada moneda. & gauge \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Las métricas se almacenan en Graphite bajo las rutas:
+
+\begin{verbatim}
+stats.gauges.app.exchange.volume.operated.{ARS|USD|BRL|EUR}
+stats.gauges.app.exchange.volume.net.{ARS|USD|BRL|EUR}
+\end{verbatim}
+
+y son visibles en el dashboard de Grafana en los paneles \textbf{Volumen Operado por Moneda} y \textbf{Volumen Neto por Moneda}.
+
+\subsubsection{Interpretación}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Volumen operado}: métrica acumulativa que crece con cada exchange exitoso. Permite detectar en tiempo real cuánto dinero está siendo movido por moneda. Útil para dimensionamiento de liquidez y para detectar anomalías (p.\ ej.\ un spike inusual en BRL podría indicar un bot o una integración defectuosa).
+    \item \textbf{Volumen neto}: diferencia entre lo que entra y lo que sale de cada moneda. Un valor neto positivo en USD indica que el servicio está \textit{vendiendo} más USD de los que compra; si este valor crece indefinidamente, señala riesgo de descalce de liquidez. En condiciones normales, el volumen neto debería oscilar alrededor de cero.
+\end{itemize}
+
+\subsubsection{Evidencia visual}
+
+Las capturas fueron tomadas durante dos workloads del escenario \texttt{exchange}, que incluye cuatro flujos de intercambio con pesos: ARS$\leftrightarrow$USD (weight 3) y ARS$\leftrightarrow$BRL (weight 2). Cada imagen muestra simultáneamente los paneles de volumen operado y volumen neto por moneda.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{images/volume-metrics-exchange-baseline.png}
+    \caption{Volumen operado y neto por moneda durante \texttt{exchange baseline} (1 req/s durante 3 min). El crecimiento es suave y proporcional a los pesos de los flujos configurados.}
+    \label{fig:volume-baseline}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{images/volume-metrics-exchange-stress.png}
+    \caption{Volumen operado y neto por moneda durante \texttt{exchange stress} (escalera 10$\rightarrow$25$\rightarrow$50 req/s). El volumen crece significativamente más rápido; la desaceleración en los escalones altos refleja la degradación del servicio bajo carga.}
+    \label{fig:volume-stress}
+\end{figure}
+
+\subsubsection{Observaciones}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Baseline}: el crecimiento del volumen operado es suave y proporcional a los pesos del escenario. ARS acumula más rápido que USD y BRL porque aparece como moneda base o contraparte en todos los pares y sus montos nominales son mayores (1.000 ARS vs 10 USD).
+    \item \textbf{Stress}: el volumen crece de forma acelerada en los primeros escalones (10--25 req/s), pero la tasa de crecimiento se aplana en los escalones de 50 req/s en adelante, evidenciando que el servicio deja de procesar exchanges exitosos a esa carga — consistente con los errores y timeouts reportados en la sección de stress del escenario \texttt{exchange}.
+    \item El volumen neto en ambos workloads oscila alrededor de cero para ARS y BRL, confirmando que los flujos bidireccionales (ARS$\rightarrow$USD y USD$\rightarrow$ARS) se equilibran entre sí con la distribución de pesos configurada.
+    \item \textbf{Limitación actual}: el acumulador de volumen reside en memoria del proceso. Al reiniciar el contenedor, el contador vuelve a cero. En una versión productiva, este estado debería persistirse en Redis para mantener continuidad histórica entre reinicios.
+\end{itemize}
+
+\subsubsection{Impacto en los atributos de calidad}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Visibilidad} $\uparrow\uparrow$: el sistema ahora emite señales de dominio que no estaban disponibles. Un operador puede detectar desequilibrios de liquidez en tiempo real sin necesidad de consultar el log de transacciones.
+    \item \textbf{Performance} (sin impacto negativo): la emisión de métricas vía UDP (protocolo de StatsD) es no bloqueante y no agrega latencia perceptible al path crítico del exchange.
+\end{itemize}
+
 \subsection{Recomendaciones generales (prioritizadas)}
 
 \begin{enumerate}[leftmargin=*]
