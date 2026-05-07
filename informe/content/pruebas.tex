@@ -544,7 +544,7 @@ Aunque JavaScript no tiene multithreading verdadero, el evento de \texttt{schedu
 \end{itemize}
 
 
-\subsubsection{Respuestas por escenario (Fase 2)}
+\subsubsection{Respuestas por escenario (Fase B)}
 
 \paragraph{Escenario rates}
 
@@ -646,11 +646,11 @@ Aunque JavaScript no tiene multithreading verdadero, el evento de \texttt{schedu
 
 \begin{itemize}[leftmargin=*]
     \item \textbf{exchange (load / stress, múltiples instancias):} runs medidos mostraron $\sim$7260 requests por escenario; medianas $\approx$ 672 ms; mean $\approx$ 654--704 ms (varía por fase), p95 $\approx$ 820--964 ms, p99 $\approx$ 871--2466 ms en picos. No se observaron vusers.failed en los escenarios de carga con réplicas.
-    
+
     \item \textbf{mixed (load / stress, múltiples instancias):} load: 7260 requests, mean $\approx$ 179 ms, median $\approx$ 2--5 ms, p95 $\approx$ 713 ms, p99 $\approx$ 773 ms; stress: 22200 requests, mean $\approx$ 184 ms, median $\approx$ 5 ms, p95 $\approx$ 714 ms, p99 $\approx$ 789 ms. En ambos casos con múltiples instancias no se registraron fallos (\texttt{vusers.failed}=0) y las 5xx/ETIMEDOUT vistas en runs anteriores desaparecieron.
 \end{itemize}
 
-\subsubsection{Respuestas por escenario (Fase 3)}
+\subsubsection{Respuestas por escenario (Fase C)}
 
 \paragraph{exchange -- Load}
 
@@ -660,6 +660,26 @@ Aunque JavaScript no tiene multithreading verdadero, el evento de \texttt{schedu
 
 \textbf{Respuesta:} Con réplicas el endpoint mantiene la mediana en $\sim$670 ms y reduce p95/p99 respecto a Fase B; no se observan fallos en la ejecución de carga.
 
+\begin{center}
+\includegraphics[width=\textwidth]{images/fase3/exchange/load/scenarios.jpeg}
+\captionof{diagrama}{Gráfica de escenarios - Load - exchange}
+\end{center}
+
+\begin{center}
+\includegraphics[width=\textwidth]{images/fase3/exchange/load/requests.jpeg}
+\captionof{diagrama}{Gráfica de estado de solicitudes - Load - exchange}
+\end{center}
+
+\begin{center}
+\includegraphics[width=\textwidth]{images/fase3/exchange/load/response.jpeg}
+\captionof{diagrama}{Gráfica de respuestas - Load - exchange}
+\end{center}
+
+\begin{center}
+\includegraphics[width=\textwidth]{images/fase3/exchange/load/resources.jpeg}
+\captionof{diagrama}{Gráfica de recursos - Load - exchange}
+\end{center}
+
 \paragraph{exchange -- Stress}
 
 \textbf{Pregunta:} ¿Qué ocurre en stress alto con réplicas?
@@ -667,6 +687,26 @@ Aunque JavaScript no tiene multithreading verdadero, el evento de \texttt{schedu
 \textbf{Resultado:} Durante las fases de stress se observaron periodos con \texttt{errors.ETIMEDOUT} y \texttt{http.codes.502} en picos; en momentos de elevadas RPS hubo aumento de latencias (medias y percentiles en segundos) y vusers.failed acumulados en los periodos más intensos.
 
 \textbf{Respuesta:} Bajo stress sostenido (RPS muy alto) aún se detectan degradaciones y timeouts en picos; el escalado horizontal reduce la incidencia y mejora medias y percentiles en fases de carga, pero el stress extremo puede seguir provocando timeouts si la latencia base de exchange no se reduce.
+
+\begin{center}
+\includegraphics[width=\textwidth]{images/fase3/exchange/stress/scenarios.jpeg}
+\captionof{diagrama}{Gráfica de escenarios - Stress - exchange}
+\end{center}
+
+\begin{center}
+\includegraphics[width=\textwidth]{images/fase3/exchange/stress/requests.jpeg}
+\captionof{diagrama}{Gráfica de estado de solicitudes - Stress - exchange}
+\end{center}
+
+\begin{center}
+\includegraphics[width=\textwidth]{images/fase3/exchange/stress/response.jpeg}
+\captionof{diagrama}{Gráfica de respuestas - Stress - exchange}
+\end{center}
+
+\begin{center}
+\includegraphics[width=\textwidth]{images/fase3/exchange/stress/resources.jpeg}
+\captionof{diagrama}{Gráfica de recursos - Stress - exchange}
+\end{center}
 
 \paragraph{mixed -- Load}
 
@@ -676,6 +716,26 @@ Aunque JavaScript no tiene multithreading verdadero, el evento de \texttt{schedu
 
 \textbf{Respuesta:} El escenario mixto con múltiples instancias muestra latencias bajas en mediana y p95/p99 razonables; no se registraron fallos.
 
+\begin{center}
+\includegraphics[width=\textwidth]{images/fase3/mixed/load/scenarios.jpeg}
+\captionof{diagrama}{Gráfica de escenarios - Load - mixed}
+\end{center}
+
+\begin{center}
+\includegraphics[width=\textwidth]{images/fase3/mixed/load/requests.jpeg}
+\captionof{diagrama}{Gráfica de estado de solicitudes - Load - mixed}
+\end{center}
+
+\begin{center}
+\includegraphics[width=\textwidth]{images/fase3/mixed/load/response.jpeg}
+\captionof{diagrama}{Gráfica de respuestas - Load - mixed}
+\end{center}
+
+\begin{center}
+\includegraphics[width=\textwidth]{images/fase3/mixed/load/resources.jpeg}
+\captionof{diagrama}{Gráfica de recursos - Load - mixed}
+\end{center}
+
 \paragraph{mixed -- Stress}
 
 \textbf{Pregunta:} ¿Cómo escala el mix en stress con réplicas?
@@ -683,6 +743,26 @@ Aunque JavaScript no tiene multithreading verdadero, el evento de \texttt{schedu
 \textbf{Resultado:} requests=22200, rps$\approx$50, mean$\approx$184 ms, median$\approx$5 ms, p95$\approx$713.5 ms, p99$\approx$788.5 ms, fallos=0.
 
 \textbf{Respuesta:} El mix escala bien con réplicas; no se observaron fallos y los percentiles se mantienen en cientos de ms, significativamente mejores que los peaks observados en Fase B.
+
+\begin{center}
+\includegraphics[width=\textwidth]{images/fase3/mixed/stress/scenarios.jpeg}
+\captionof{diagrama}{Gráfica de escenarios - Stress - mixed}
+\end{center}
+
+\begin{center}
+\includegraphics[width=\textwidth]{images/fase3/mixed/stress/requests.jpeg}
+\captionof{diagrama}{Gráfica de estado de solicitudes - Stress - mixed}
+\end{center}
+
+\begin{center}
+\includegraphics[width=\textwidth]{images/fase3/mixed/stress/response.jpeg}
+\captionof{diagrama}{Gráfica de respuestas - Stress - mixed}
+\end{center}
+
+\begin{center}
+\includegraphics[width=\textwidth]{images/fase3/mixed/stress/resources.jpeg}
+\captionof{diagrama}{Gráfica de recursos - Stress - mixed}
+\end{center}
 
 \subsubsection{Comparación con Fase B}
 
@@ -694,7 +774,7 @@ En Fase B se vieron 502/504 y \texttt{errors.ETIMEDOUT} en mixed y p95/p99 en se
 
 \begin{itemize}[leftmargin=*]
     \item En Fase B el contenedor activo intentó escribir en disco y falló, provocando caídas y errores 5xx/ETIMEDOUT.
-    
+
     \item En Fase C la combinación de Redis + múltiples réplicas:
     \begin{itemize}[leftmargin=2em]
         \item Reduce I/O por instancia (Redis más eficiente que escritura en disco).
@@ -707,36 +787,78 @@ En Fase B se vieron 502/504 y \texttt{errors.ETIMEDOUT} en mixed y p95/p99 en se
 
 \begin{itemize}[leftmargin=*]
     \item \texttt{exchange-stress-multiples-instancias.txt} -- Summary: \texttt{http.codes.200}=7260, mean$\approx$653.6 ms, median$\approx$671.9 ms, p95$\approx$820.7 ms, p99$\approx$871.5 ms; vusers.failed=0.
-    
+
     \item \texttt{mixed-load-multiples-instancias.txt} -- Summary: \texttt{http.codes.200}=7260, mean$\approx$178.7 ms, median$\approx$2--4 ms, p95$\approx$713.5 ms, p99$\approx$772.9 ms; vusers.failed=0.
-    
+
     \item \texttt{mixed-stress-multiples-instancias.txt} -- Summary: \texttt{http.codes.200}=22200, mean$\approx$184 ms, median$\approx$5 ms, p95$\approx$727.9 ms, p99$\approx$788.5 ms; vusers.failed=0.
 \end{itemize}
 
-\subsection{Conclusión}
+\subsection{Conclusión -- Comparativa de las 3 fases}
 
-\textbf{Estado actual del sistema arVault:}
-\begin{itemize}
-    \item $\checkmark$ Funciona bajo carga light ($\sim$ 1-10 req/s)
-    \item $\star$ Degradación visible en carga normal (20 req/s)
-    \item $\otimes$ Falla completamente en estrés (100+ req/s)
+\subsubsection{Qué se midió}
+
+Latencia por endpoint (p50, p95, p99), throughput (requests y RPS), y tasa de errores (HTTP 5xx, ETIMEDOUT, \texttt{vusers.failed}) para tres escenarios representativos:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{rates:} rápido (sin lógica de negocio)
+    \item \textbf{exchange:} lento por lógica de negocio simulada (mock transfer 400--800 ms)
+    \item \textbf{mixed:} mezcla realista (60\% rates, 30\% exchange, 5\% accounts, 5\% log)
 \end{itemize}
 
-\textbf{Punto de ruptura:} $\sim$50 req/s para reads, $\sim$5 req/s para exchanges.
+\subsubsection{Fase A -- Baseline (proyecto original)}
 
-\textbf{Root causes:}
-\begin{enumerate}
-    \item Single-threaded Node.js + operaciones síncronas de I/O
-    \item Mock transfer de 200-400ms (latencia inherente pero amplificada)
-    \item Memory leak del \texttt{log} array (acumulación sin límite)
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Estado:} código original sin Redis ni cambios operativos.
+
+    \item \textbf{Observaciones:}
+    \begin{itemize}[leftmargin=2em]
+        \item \texttt{rates} muy rápido y estable.
+        \item \texttt{exchange} con latencia base alta (mediana $\sim$600 ms) que ya genera colas.
+        \item \texttt{mixed} mostró que las operaciones lentas contaminan endpoints rápidos.
+        \item En stress aparecieron muchos timeouts y 5xx por saturación y fallos de persistencia en disco.
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{Fase B -- Redis + arquitectura de capas + healthcheck + keepalive}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Estado:} se migró la persistencia a Redis, se introdujo separación por capas y se añadió healthcheck/keepalive en despliegue.
+
+    \item \textbf{Efecto observado:}
+    \begin{itemize}[leftmargin=2em]
+        \item Se eliminaron crashes por escrituras a disco.
+        \item Health del API estable; runs de \texttt{exchange} y \texttt{rates} respondiendo correctamente.
+        \item \texttt{mixed} aún mostró timeouts/ETIMEDOUT en algunas ejecuciones.
+    \end{itemize}
+
+    \item \textbf{Interpretación:} las mejoras operativas corrigieron fallos críticos de disponibilidad, pero la latencia de negocio sigue siendo la restricción principal.
+\end{itemize}
+
+\subsubsection{Fase C -- Escalado horizontal (3 instancias)}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Estado:} se desplegaron 3 réplicas del API y se balanceó tráfico por nginx.
+
+    \item \textbf{Efecto observado:}
+    \begin{itemize}[leftmargin=2em]
+        \item Desaparición de la mayoría de 5xx/ETIMEDOUT en \texttt{mixed}.
+        \item Reducción significativa de p95/p99 en todas las pruebas mixtas y de stress.
+        \item Throughput sostenido mejor manejado por el cluster de réplicas.
+    \end{itemize}
+
+    \item \textbf{Interpretación:} el escalado horizontal mitigó la saturación del event loop por instancia y amortiguó la latencia del \texttt{exchange}, recuperando disponibilidad y reduciendo errores de gateway.
+\end{itemize}
+
+\subsubsection{Conclusión general}
+
+Lo medido confirma que el cuello de botella original era:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Latencia interna de \texttt{exchange}} (400--800 ms por operación).
+    \item \textbf{Persistencia basada en archivos} (escrituras bloqueantes a disco).
 \end{enumerate}
 
-\textbf{Línea de comparación establecida:} Los datos de este baseline servirán para medir mejoras en Fase B (implementación de tácticas). Se espera que con Redis + réplicas, el sistema escale a \textbf{200+ req/s sostenibles}.
-
-\vspace{1cm}
-\textbf{Generado:} 26 de abril de 2026 \\
-\textbf{Datos:} 13 pruebas completadas, 180k+ requests ejecutados \\
-\textbf{Archivos:} \texttt{/perf/results/baseline/*.json}
+Las acciones realizadas en \textbf{Fase B} (Redis, capas, healthcheck) eliminaron fallos de persistencia y mejoraron la estabilidad. Las de \textbf{Fase C} (réplicas) resolvieron la saturación al distribuir la carga, reduciendo timeouts y mejorando percentiles de latencia en todo el sistema.
 
 
 \subsection{Formato de las respuestas}

@@ -132,15 +132,20 @@ La función ignora todos sus parámetros y siempre resuelve \texttt{true} tras u
 
 \subsubsection{Atributos de calidad afectados}
 
-\paragraph{User-Perceived Performance} ↓↓: Cada \texttt{POST /exchange} consume un mínimo garantizado de 400 ms y un máximo de \(\sim\)800 ms solo en espera de transfers, antes de cualquier procesamiento. Bajo carga, los requests se encolan en el event loop y la latencia percibida crece linealmente.
+\paragraph{User-Perceived Performance}
+Cada \texttt{POST /exchange} consume un mínimo garantizado de 400 ms y un máximo de \(\sim\)800 ms solo en espera de transfers, antes de cualquier procesamiento. Bajo carga, los requests se encolan en el event loop y la latencia percibida crece linealmente.
 
-\paragraph{Efficiency} ↓ Las dos llamadas podrían ser paralelas (\texttt{Promise.all}) sin afectar la corrección del flujo, reduciendo la latencia mínima a 200–400 ms. La decisión de hacerlas secuenciales duplica innecesariamente el tiempo de espera.
+\paragraph{Efficiency}
+Las dos llamadas podrían ser paralelas (\texttt{Promise.all}) sin afectar la corrección del flujo, reduciendo la latencia mínima a 200–400 ms. La decisión de hacerlas secuenciales duplica innecesariamente el tiempo de espera.
 
-\paragraph{Visibility} ↓↓ Las métricas de latencia del dashboard de Grafana reflejan estos 400–800 ms artificiales. Cuando se integre el servicio real de transferencias, las métricas históricas no serán comparables ni útiles como baseline.
+\paragraph{Visibility}
+Las métricas de latencia del dashboard de Grafana reflejan estos 400–800 ms artificiales. Cuando se integre el servicio real de transferencias, las métricas históricas no serán comparables ni útiles como baseline.
 
-\paragraph{Testability} ↓↓ El camino de falla de la segunda transferencia (rollback en línea 95) nunca se ejecuta porque \texttt{transfer()} nunca falla. Ese código existe pero no ha sido testeado. Su corrección bajo condiciones reales es desconocida.
+\paragraph{Testability}
+El camino de falla de la segunda transferencia (rollback en línea 95) nunca se ejecuta porque \texttt{transfer()} nunca falla. Ese código existe pero no ha sido testeado. Su corrección bajo condiciones reales es desconocida.
 
-\paragraph{Interoperability} ↓↓ No existe contrato definido para el servicio de transferencias real. No hay interfaz, tipo de retorno especificado ni manejo de errores diseñado para el caso donde la transferencia falla parcialmente. La integración futura deberá rediseñar esta parte del flujo.
+\paragraph{Interoperability}
+No existe contrato definido para el servicio de transferencias real. No hay interfaz, tipo de retorno especificado ni manejo de errores diseñado para el caso donde la transferencia falla parcialmente. La integración futura deberá rediseñar esta parte del flujo.
 
 \subsection{Instancia única sin redundancia ni healthcheck}
 
@@ -324,16 +329,10 @@ El stack de observabilidad (StatsD → Graphite → Grafana) existe, pero la apl
     \item \textbf{cAdvisor:} métricas de contenedores (CPU, memoria del proceso completo).
 \end{itemize}
 
-\textbf{Impacto sobre Visibility ↓↓↓:} No se captura ninguna métrica de negocio ni de comportamiento interno:
-\begin{itemize}
-    \item No se mide el número de exchanges exitosos vs. fallidos por motivo (fondos insuficientes, error de sistema).
-    \item No se mide el volumen operado por par de monedas (ARS/USD, USD/EUR, etc.).
-    \item No se mide la evolución de los saldos de las cuentas internas.
-    \item No se detecta cuándo un saldo está próximo a agotarse (riesgo de parar operaciones).
-    \item No se puede distinguir la latencia de la lógica de negocio de la latencia de la capa de red.
-    \item Los errores de la aplicación solo aparecen en \texttt{console.error}, no en ningún sistema de alertas.
-\end{itemize}
-El panel de Grafana muestra latencia y RPS, pero todo medido desde el generador de carga, no desde el servidor. Una degradación interna del servicio (por ejemplo, I/O lento al guardar el log) sería invisible hasta que impacte en la latencia cliente.
+\subsubsection{Atributos de calidad afectados}
+
+\paragraph{Visibility}
+No se captura ninguna métrica de negocio ni de comportamiento interno: no se mide el número de exchanges exitosos vs. fallidos por motivo (fondos insuficientes, error de sistema), el volumen operado por par de monedas, la evolución de los saldos de las cuentas internas, ni cuándo un saldo está próximo a agotarse. No se puede distinguir la latencia de la lógica de negocio de la latencia de la capa de red. Los errores de la aplicación solo aparecen en \texttt{console.error}, no en ningún sistema de alertas. El panel de Grafana muestra latencia y RPS, pero todo medido desde el generador de carga, no desde el servidor. Una degradación interna del servicio (por ejemplo, I/O lento al guardar el log) sería invisible hasta que impacte en la latencia cliente.
 
 \subsection{HTTP 500 para errores de negocio}
 
@@ -349,9 +348,13 @@ if (exchangeResult.ok) {
 
 Una operación rechazada por fondos insuficientes retorna HTTP 500 Internal Server Error, el mismo código que un crash del servidor.
 
-\textbf{Impacto sobre Visibility ↓↓:} El panel ``Requests State'' del dashboard de Grafana agrupa en ``Errors'' tanto los crashes de infraestructura como los rechazos de negocio normales. Es imposible saber si la tasa de error aumentó porque el servidor está fallando o porque los usuarios se quedan sin fondos. Las alertas sobre ese panel son inherentemente ruidosas e inaccionables.
+\subsubsection{Atributos de calidad afectados}
 
-\textbf{Impacto sobre Usabilidad ↓↓↓:} Las apps mobile que consumen esta API deben tratar el \texttt{ok: false} dentro del body JSON para distinguir el rechazo de negocio del error de servidor, ya que el código HTTP no lo informa correctamente. La mayoría de los frameworks HTTP cliente (y las apps de los usuarios) interpretan un 500 como ``el servidor rompió'', no como ``no tenés fondos'', generando mensajes de error confusos para el usuario final. El código correcto sería HTTP 422 (Unprocessable Entity) para rechazos de negocio.
+\paragraph{Visibility}
+El panel ``Requests State'' del dashboard de Grafana agrupa en ``Errors'' tanto los crashes de infraestructura como los rechazos de negocio normales. Es imposible saber si la tasa de error aumentó porque el servidor está fallando o porque los usuarios se quedan sin fondos. Las alertas sobre ese panel son inherentemente ruidosas e inaccionables.
+
+\paragraph{Usabilidad}
+Las apps mobile que consumen esta API deben tratar el \texttt{ok: false} dentro del body JSON para distinguir el rechazo de negocio del error de servidor, ya que el código HTTP no lo informa correctamente. La mayoría de los frameworks HTTP cliente (y las apps de los usuarios) interpretan un 500 como ``el servidor rompió'', no como ``no tenés fondos'', generando mensajes de error confusos para el usuario final. El código correcto sería HTTP 422 (Unprocessable Entity) para rechazos de negocio.
 
 \subsection{Validación de entrada por falsiness}
 
@@ -425,15 +428,16 @@ scheduleSave(log, LOG, 1000);       // state.js:23 — serializa el array comple
 \endhead
 \bottomrule
 \endfoot
-Persistencia JSON con save periódico & ↓↓ & — & — & ↓↓ \\
-Estado en memoria sin concurrencia & ↓ & — & ↓↓ & — \\
-\texttt{transfer()} mockeada secuencial & — & — & ↓↓ & ↓ \\
-Instancia única, sin réplicas & ↓↓↓ & — & ↓↓ & — \\
-Sin autenticación propia & — & — & — & — \\
-Sin instrumentación en la app & — & — & — & — \\
+Evolución: del monolito acoplado a arquitectura en capas & — & — & — & — \\
+Variables en memoria & — & — & — & — \\
+Persistencia lazy & — & — & — & — \\
+Persistencia en archivos JSON & ↓↓ & — & — & ↓↓ \\
+Función \texttt{transfer()} mockeada de forma secuencial & — & — & ↓↓ & ↓ \\
+Instancia única sin redundancia ni healthcheck & ↓↓↓ & — & ↓↓ & — \\
+Sin instrumentación en la aplicación & — & — & — & — \\
 HTTP 500 para errores de negocio & — & — & — & — \\
-Validación por falsiness & — & — & — & — \\
-Log ilimitado en memoria & ↓ & ↓↓ & ↓ & ↓↓ \\
+Validación de entrada por falsiness & — & — & — & — \\
+Log de transacciones ilimitado en memoria & ↓ & ↓↓ & ↓ & ↓↓ \\
 Sin OpenAPI / versionado & — & — & — & — \\
 Nginx upstream hardcodeado & ↓ & — & — & — \\
 \end{longtable}
@@ -461,15 +465,16 @@ Nginx upstream hardcodeado & ↓ & — & — & — \\
 \endhead
 \bottomrule
 \endfoot
-Persistencia JSON con save periódico & ↓↓↓ & — & — & ↓ & — & — & — \\
-Estado en memoria sin concurrencia & — & — & — & ↓↓ & — & — & — \\
-\texttt{transfer()} mockeada secuencial & — & — & ↓↓ & ↓↓ & — & ↓↓ & — \\
-Instancia única, sin réplicas & ↓↓↓ & — & — & — & ↓ & — & — \\
-Sin autenticación propia & — & ↓↓↓ & — & — & — & ↓ & — \\
-Sin instrumentación en la app & — & — & ↓↓↓ & — & — & — & — \\
+Evolución: del monolito acoplado a arquitectura en capas & — & — & — & ↑↑ & — & — & — \\
+Variables en memoria & ↓↓↓ & — & — & — & — & — & — \\
+Persistencia lazy & — & — & — & — & — & — & — \\
+Persistencia en archivos JSON & — & — & — & ↓ & — & — & — \\
+Función \texttt{transfer()} mockeada de forma secuencial & — & — & ↓↓ & ↓↓ & — & ↓↓ & — \\
+Instancia única sin redundancia ni healthcheck & ↓↓↓ & — & — & — & ↓ & — & — \\
+Sin instrumentación en la aplicación & — & — & ↓↓↓ & — & — & — & — \\
 HTTP 500 para errores de negocio & — & — & ↓↓ & — & — & — & ↓↓↓ \\
-Validación por falsiness & — & ↓ & — & ↓ & — & — & ↓↓ \\
-Log ilimitado en memoria & — & — & — & — & — & — & ↓ \\
+Validación de entrada por falsiness & — & ↓ & — & ↓ & — & — & ↓↓ \\
+Log de transacciones ilimitado en memoria & — & — & — & — & — & — & ↓ \\
 Sin OpenAPI / versionado & — & — & — & ↓ & — & ↓↓ & ↓ \\
 Nginx upstream hardcodeado & ↓↓ & — & — & — & ↓↓ & — & — \\
 \end{longtable}
