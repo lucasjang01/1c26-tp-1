@@ -123,5 +123,13 @@ Sin distribución de carga entre instancias, todos los requests concurrentes com
 Impacto sobre Scalability
 Nginx no está configurado para balancear hacia múltiples backends. Aunque se pudieran levantar réplicas (`docker compose up --scale api=3`), el upstream hardcodeado a `exchange-api-1` ignorará las instancias adicionales. Para habilitar el balanceo se requiere modificar la configuración de Nginx.
 
-\subsection{Falta de logs de operaciones}
-Impacta en el no repudio (security) y la falta de poder hacer una auditoría.
+\subsubsection{Mejora propuesta}
+
+Con Redis como estado compartido y Nginx reconfigurado para balancear carga, el \textbf{API Server} pasa de ser una instancia única a poder escalar horizontalmente ($1..*$). Nginx distribuye los requests entre las réplicas disponibles, eliminando el SPOF y permitiendo absorber mayor carga concurrente.
+
+\begin{center}
+\includegraphics[width=\textwidth]{images/multiple instances component and connectors.png}
+\captionof{diagrama}{El único cambio respecto al diagrama anterior es la multiplicidad $1..*$ entre \textbf{Nginx} y la aplicación: ahora pueden existir múltiples instancias, cada una con su propia cadena de Controllers, Services y Repositories, todas compartiendo el mismo estado en Redis.}
+\label{diag:arquitectura_multiple_instancias}
+\end{center}
+
