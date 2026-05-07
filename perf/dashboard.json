@@ -475,6 +475,76 @@
         "align": false,
         "alignLevel": null
       }
+    },
+    {
+      "title": "Volumen Operado por Moneda",
+      "type": "graph",
+      "datasource": "Graphite",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 100,
+      "targets": [
+        {
+          "refId": "A",
+          "target": "aliasByNode(stats.gauges.app.exchange.volume.operated.*, 6)"
+        }
+      ],
+      "xaxis": {
+        "mode": "time",
+        "show": true
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "show": true
+        },
+        {
+          "format": "short",
+          "show": false
+        }
+      ],
+      "lines": true,
+      "linewidth": 2,
+      "fill": 1
+    },
+    {
+      "title": "Volumen Neto por Moneda",
+      "type": "graph",
+      "datasource": "Graphite",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 101,
+      "targets": [
+        {
+          "refId": "A",
+          "target": "aliasByNode(stats.gauges.app.exchange.volume.net.*, 6)"
+        }
+      ],
+      "xaxis": {
+        "mode": "time",
+        "show": true
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "show": true
+        },
+        {
+          "format": "short",
+          "show": false
+        }
+      ],
+      "lines": true,
+      "linewidth": 2,
+      "fill": 1
     }
   ],
   "refresh": "5s",
@@ -581,7 +651,17 @@
       "2h",
       "1d"
     ],
-    "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"]
+    "time_options": [
+      "5m",
+      "15m",
+      "1h",
+      "6h",
+      "12h",
+      "24h",
+      "2d",
+      "7d",
+      "30d"
+    ]
   },
   "timezone": "",
   "title": "Main dashboard",
