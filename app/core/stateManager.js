@@ -1,78 +1,64 @@
+import Redis from "ioredis";
 import { fileURLToPath } from "url";
 import path from "path";
 import fs from "fs";
 
-let accounts = null;
-let rates = null;
-let log = null;
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const ACCOUNTS = "../state/accounts.json";
-const RATES = "../state/rates.json";
-const LOG = "../state/log.json";
+const ACCOUNTS_KEY = "accounts";
+const RATES_KEY = "rates";
+const LOG_KEY = "log";
+
+let redis;
 
 export async function init() {
-  accounts = await load(ACCOUNTS);
-  rates = await load(RATES);
-  log = await load(LOG);
+  redis = new Redis({ host: process.env.REDIS_HOST || "localhost", port: 6379 });
 
-  scheduleSave(() => accounts, ACCOUNTS, 1000);
-  scheduleSave(() => rates, RATES, 5000);
-  scheduleSave(() => log, LOG, 1000);
+  if (!(await redis.exists(ACCOUNTS_KEY))) {
+    const data = await loadFromFile("../state/accounts.json");
+    await redis.set(ACCOUNTS_KEY, JSON.stringify(data ?? []));
+  }
+  if (!(await redis.exists(RATES_KEY))) {
+    const data = await loadFromFile("../state/rates.json");
+    await redis.set(RATES_KEY, JSON.stringify(data ?? {}));
+  }
+  if (!(await redis.exists(LOG_KEY))) {
+    const data = await loadFromFile("../state/log.json");
+    await redis.set(LOG_KEY, JSON.stringify(data ?? []));
+  }
 }
 
-export function getAccounts() {
-  return accounts;
+export async function getAccounts() {
+  return JSON.parse(await redis.get(ACCOUNTS_KEY));
 }
 
-export function getRates() {
-  return rates;
+export async function getRates() {
+  return JSON.parse(await redis.get(RATES_KEY));
 }
 
-export function getLog() {
-  return log;
+export async function getLog() {
+  return JSON.parse(await redis.get(LOG_KEY));
 }
 
-export async function saveAccounts() {
-  await save(accounts, ACCOUNTS);
+export async function saveAccounts(accounts) {
+  await redis.set(ACCOUNTS_KEY, JSON.stringify(accounts));
 }
 
-export async function saveRates() {
-  await save(rates, RATES);
+export async function saveRates(rates) {
+  await redis.set(RATES_KEY, JSON.stringify(rates));
 }
 
-export async function saveLog() {
-  await save(log, LOG);
+export async function saveLog(log) {
+  await redis.set(LOG_KEY, JSON.stringify(log));
 }
 
-async function load(fileName) {
+async function loadFromFile(fileName) {
   const filePath = path.join(__dirname, fileName);
   try {
-    await fs.promises.access(filePath);
     const raw = await fs.promises.readFile(filePath, "utf8");
     return JSON.parse(raw);
-  } catch (err) {
-    if (err.code === "ENOENT") {
-      console.error(`${filePath} not found`);
-    } else {
-      console.error(`Error loading ${filePath}:`, err);
-    }
+  } catch {
+    return null;
   }
-}
-
-async function save(data, fileName) {
-  const filePath = path.join(__dirname, fileName);
-  try {
-    await fs.promises.writeFile(filePath, JSON.stringify(data, null, 2));
-  } catch (err) {
-    console.error(`Error writing to ${filePath}:`, err);
-  }
-}
-
-function scheduleSave(getData, fileName, period) {
-  setInterval(async () => {
-    await save(getData(), fileName);
-  }, period);
 }
