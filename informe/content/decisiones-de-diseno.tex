@@ -5,185 +5,36 @@
 
 Originalmente, el servicio constaba de un monolito de una sola capa. Había tres archivos con roles distintos (\texttt{app.js} operando de HTTP handler, \texttt{exchange.js} manejando lógica de negocio, y \texttt{state.js} interactuando con la persistencia en disco) que se encontraban acoplados directamente sin una clara inyección de dependencias ni definición de interfaces seguras. Todo corría en el hilo de un único proceso de Node.js, penalizando \textit{Testability}, \textit{Maintainability} y \textit{Modifiability}. El caso base se ilustra debajo:
 \begin{center}
-\begin{tcolorbox}[
-  breakable,
-  colback=white,
-  colframe=black,
-  boxrule=0.5pt
-]
-\begin{verbatim}
-            +-----------------------------------------------+
-            |                 Cliente HTTP                  |
-            |                    :5555                      |
-            +-----------------------------------------------+
-                                  |
-                                  | HTTP
-                                  v
-            +-----------------------------------------------+
-            |                    Nginx                      |
-            |                :80  -> api:3000               |
-            |             static/ -> store/static           |
-            +-----------------------------------------------+
-                                  |
-                                  v
-            +-----------------------------------------------+
-            |            app.js (Express) :3000             | <- Presentación
-            |-----------------------------------------------|
-            | GET  /accounts   PUT  /rates                  |
-            | GET  /rates      POST /exchange               |
-            | GET  /log        PUT  /accounts/:id/balance   |
-            +-----------------------------------------------+
-                                  |
-                                  | importa
-                                  v
-            +-----------------------------------------------+
-            |                 exchange.js                   | <- Dominio
-            |-----------------------------------------------|
-            | exchange()      transfer() (stub ~200-400 ms) |
-            | getAccounts()   setRate()                     |
-            | setBalance()    getLog()                      |
-            | getRates()                                    |
-            +-----------------------------------------------+
-                                  |
-                                  | importa
-                                  v
-            +-----------------------------------------------+
-            |              state.js                         | <- Persistencia
-            |-----------------------------------------------|
-            | init()          cheduleSave()                 |
-            | load()                                        |
-            +-----------------------------------------------+
-                                  |
-                                  | fs (JSON)
-                                  v
-            +-----------------------------------------------+
-            |             app/state/                        | <- Disco
-            |-----------------------------------------------|
-            | accounts.json    log.json                     |
-            | rates.json                                    |
-            +-----------------------------------------------+
-
-            -------------------------------------------------
-                    Observabilidad (docker-compose)
-            -------------------------------------------------
-           cAdvisor --> statsd --> Graphite/StatsD --> Grafana
-\end{verbatim}
-\end{tcolorbox}
-
+\includegraphics[width=\textwidth]{images/old component and connectors.png}
 \captionof{diagrama}{Arquitectura monolítica del sistema}
 \label{diag:arquitectura_monolito}
 \end{center}
 
-En exchange.js:
-accounts = stateAccounts();  // alias al mismo array en memoria
-rates = stateRates();
-log = stateLog();
-state.js guarda esas mismas referencias y las persiste con scheduleSave. exchange.js muta counterAccount.balance, baseAccount.balance, log.push(...) directamente — sin pasar por ningún método de state.js. Es decir, la capa de dominio escribe en la capa de persistencia bypaseando su interfaz.
+El \textbf{Exchange Service} accede directamente a referencias internas del \textbf{State Manager} y muta su estado sin pasar por ninguna interfaz definida, bypaseando por completo los métodos expuestos por el \textbf{State Manager}.
 
-app.js también mezcla responsabilidades
-app.js: hace validación de input, llama al servicio Y decide el formato de respuesta todo en el mismo handler. No hay capa de controlador separada.
+Además, el \textbf{API Server} mezcla responsabilidades: realiza validación de input, invoca la lógica de negocio y decide el formato de respuesta todo en el mismo handler, sin delegar al \textbf{Exchange Service} de forma limpia.
 
-Después:
+La arquitectura propuesta introduce una separación en capas con responsabilidades bien delimitadas. El \textbf{API Server} delega cada request a uno de cuatro controladores especializados: \textbf{Account Controller}, \textbf{Rate Controller}, \textbf{Exchange Controller} y \textbf{Log Controller}, que se encargan exclusivamente de la validación de input y el mapeo de respuestas HTTP. Cada controlador invoca a su correspondiente servicio de dominio (\textbf{Account Service}, \textbf{Rate Service}, \textbf{Exchange Service} y \textbf{Log Service}), donde reside la lógica de negocio. Los servicios acceden al estado únicamente a través de repositorios (\textbf{Account Repository}, \textbf{Rate Repository}, \textbf{Log Repository}), que exponen interfaces limpias y son los únicos componentes autorizados a interactuar con el \textbf{State Manager}. Este último centraliza toda la lectura y escritura a disco, persistiendo el estado en \texttt{accounts.json}, \texttt{rates.json} y \texttt{log.json}.
+
 \begin{center}
-\begin{tcolorbox}[
-  breakable,
-  colback=white,
-  colframe=black,
-  boxrule=0.5pt
-]
-\begin{verbatim}
-  +-------------------------------------------------------------------------------+
-  |                              Cliente (HTTP)                                   |
-  |                                 :3000                                         |
-  +-------------------------------------------------------------------------------+
-                                      |
-                                      v
-  +-------------------------------------------------------------------------------+
-  |                                 app.js                                        |
-  |                       Express - registra rutas - init()                       |
-  +-------------------------------------------------------------------------------+
-            |                |                  |                    |
-            v                v                  v                    v
-  +----------------+ +----------------+ +----------------+ +----------------------+
-  | account        | | rate           | | log            | | exchange             |
-  | Controller     | | Controller     | | Controller     | | Controller           |
-  |----------------| |----------------| |----------------| |----------------------|
-  | getAll         | | getAll         | | getAll         | | postExchange         |
-  | setBalance     | | setRate        | |                | |                      |
-  +----------------+ +----------------+ +----------------+ +----------------------+
-          |                  |                  |                      |
-          v                  v                  |                      v
-  +----------------+ +----------------+         |          +----------------------+
-  | account        | | rate           |         |          | exchange Service     |
-  | Service        | | Service        |         |          |----------------------|
-  |----------------| |----------------|         |          | performExch.         |
-  | getAll         | | getAll         |         |          +----------------------+
-  | setBalance     | | setRate        |         |                      |
-  +----------------+ +----------------+         |                      v
-          |                  |                  |          +----------------------+
-          v                  v                  |          | transfer Service     |
-  +----------------+ +----------------+         |          |----------------------|
-  | account        | | rate           |         |          | transfer() (mock)    |
-  | Repository     | | Repository     |         |          +----------------------+
-  |----------------| |----------------|         |                      |
-  | findAll        | | getAll         |         |                      v
-  | findById       | | getRate        |         |          +----------------------+
-  | findByCurr.    | | setRate        |         |          | account + rate + log |
-  | updateBal.     | |                |         |          | Repositories         |
-  +----------------+ +----------------+         |          +----------------------+
-          |                   |                 |
-          +-------------------+-------+---------+
-                                      |
-                                      v
-                             +----------------------+
-                             | log Repository       |
-                             |----------------------|
-                             | findAll              |
-                             | add                  |
-                             +----------------------+
-                                        |
-                                        v
-                     +---------------------------------------+
-                     |         core/stateManager.js          |
-                     |---------------------------------------|
-                     | getAccounts()   getRates()   getLog() |
-                     | saveAccounts()  saveRates()  saveLog()|
-                     | scheduleSave() (cada 1s / 5s / 1s)    |
-                     +---------------------------------------+
-                                       |
-                                       | fs (JSON)
-                                       v
-                     +---------------------------------------+
-                     |           Archivos de estado          |
-                     |---------------------------------------|
-                     | accounts.json                         |
-                     | rates.json                            |
-                     | log.json                              |
-                     +---------------------------------------+
-\end{verbatim}
-\end{tcolorbox}
-\captionof{diagrama}{Arquitectura monolítica luego de la mejora}
+\includegraphics[width=\textwidth]{images/new component and connectors.png}
+\captionof{diagrama}{Arquitectura luego de la mejora}
 \label{diag:arquitectura_monolito_despues}
 \end{center}
 
-\begin{table}[H]
-\centering
-\renewcommand{\arraystretch}{1.3}
-\begin{tabular}{|p{3cm}|p{5.5cm}|p{5.5cm}|}
-\hline
-\textbf{Capa} & \textbf{Archivos} & \textbf{Responsabilidad} \\
-\hline
-Presentación & controllers/ + app.js & HTTP, validación de estructura, mapeo de errores a status codes \\
-\hline
-Dominio & services/ & Reglas de negocio, validaciones de dominio (balance >= 0, etc.) \\
-\hline
-Persistencia & repositories/ + core/stateManager.js & Acceso y mutación del estado, lectura/escritura a disco \\
-\hline
-Utils & utils/errors.js + utils/validators.js & Tipos de error compartidos, funciones de validación puras \\
-\hline
-\end{tabular}
-\captionof{tabla}{Capas de la aplicación y sus responsabilidades}
-\end{table}
+\subsubsection{Atributos de calidad afectados}
+
+\paragraph{Testability}
+Es el atributo más beneficiado por este cambio. En la arquitectura original, testear el \textbf{Exchange Service} implicaba activar toda la cadena de componentes, ya que no había separación entre lógica de negocio, acceso a datos y manejo de estado. En la nueva arquitectura, cada capa puede probarse de forma aislada: los Controllers pueden testearse con mocks de los Services, los Services con mocks de los Repositories, y los Repositories con mocks del \textbf{State Manager}. Esto permite pruebas unitarias verdaderas y facilita la detección temprana de bugs.
+
+\paragraph{Maintainability}
+También mejora considerablemente. La separación por capas y por responsabilidades hace que encontrar a nivel de código dónde está cada cosa sea más fácil e intuitivo, sin tener que recorrer código ajeno a lo que se busca. Si surge un bug, el patrón establecido lo hace directo de encontrar; cada feature nuevo sigue la misma estructura.
+
+\paragraph{Modifiability}
+El cambio tiene un impacto positivo significativo. Con la arquitectura anterior, agregar un nuevo dominio o modificar uno existente podía requerir alterar componentes compartidos como el \textbf{Exchange Service}, propagando el riesgo de cambio por toda la cadena. En la nueva arquitectura, cada dominio es una columna vertical independiente (\textbf{Controller} $\rightarrow$ \textbf{Service} $\rightarrow$ \textbf{Repository}), de modo que agregar un nuevo dominio implica simplemente agregar una nueva columna sin tocar las existentes. Del mismo modo, cambiar la fuente de datos de los logs, por ejemplo, solo requiere modificar el \textbf{Log Repository}, sin afectar al \textbf{Log Service} ni al \textbf{Log Controller}. Esto reduce el costo y el riesgo de cada modificación futura.
+
+\paragraph{Performance (atributo afectado negativamente)}
+Si bien en teoría la nueva arquitectura introduce más niveles de indirección y por lo tanto podría esperarse un impacto negativo en la latencia, en la práctica las métricas no mostraron diferencias significativas respecto a la arquitectura anterior, o las diferencias registradas fueron lo suficientemente pequeñas como para considerarse despreciables. El overhead generado por los saltos adicionales entre capas no se tradujo en una degradación observable del sistema.
 
 
 \subsection{Variables en memoria}
