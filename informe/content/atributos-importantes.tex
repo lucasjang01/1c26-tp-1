@@ -7,9 +7,11 @@
 Considerando la naturaleza financiera y transaccional del servicio provisto (\textit{arVault}, un \textit{exchange} de criptomonedas y dinero fiat), se han determinado como centrales los siguientes Atributos de Calidad (QAs):
 
 \begin{itemize}
-    \item \textbf{Confiabilidad (Reliability) e Integridad de Datos:} En un flujo transaccional donde operan saldos económicos (balances, transferencias), el sistema no debe perder información bajo ninguna circunstancia (por ejemplo, ante la caída del proceso de Node.js). Todas las transacciones confirmadas deben reflejarse en un medio persistente seguro.
-    \item \textbf{Desempeño (Performance):} El servicio debe procesar múltiples operaciones concurrentes de \textit{exchange} con un tiempo de respuesta (latencia) adecuado y un nivel alto de \textit{throughput} bajo momentos de mayor demanda.
-    \item \textbf{Escalabilidad (Scalability):} Previendo un escenario con cantidad creciente de usuarios operando simultáneamente, el servicio debe tener la capacidad de ser replicado (escalamiento horizontal) u optimizado para digerir la carga sin generar cuellos de botella irreparables.
+    \item \textbf{Seguridad (Security):} Al tratarse de una \textit{fintech} que opera saldos reales en múltiples monedas, la seguridad es el atributo mas critico. Si bien existe un componente externo que gestiona autenticación y autorización, hay aspectos de seguridad que recaen directamente sobre el servicio: la integridad de las transacciones, la prevención de condiciones de carrera que permitan operar con fondos insuficientes y la consistencia del estado financiero. Una brecha en este atributo tiene consecuencias legales, financieras y reputacionales inmediatas.
+    \item \textbf{Disponibilidad (Availability):} arVault ya sufrió caída de reputación y pérdida de inversores por problemas en el servicio de cambio. Para una billetera digital, la indisponibilidad equivale a pérdida de negocio y confianza de los usuarios. Este atributo es condición necesaria para la continuidad operativa de la empresa.
+    \item \textbf{Desempeño (Performance):} El diferencial de arVault es ofrecer la tasa de cambio más conveniente del mercado. Si las operaciones de \textit{exchange} presentan latencias elevadas, los usuarios perciben el servicio como poco confiable, especialmente en un contexto donde los tipos de cambio fluctúan en tiempo real. El sistema debe procesar múltiples operaciones concurrentes con un tiempo de respuesta adecuado y un alto nivel de \textit{throughput} bajo momentos de mayor demanda.
+    \item \textbf{Escalabilidad (Scalability):} La startup se encuentra en crecimiento activo, captando usuarios e inversores. La arquitectura original fue construida bajo la consigna \textit{fake it until you make it} y no fue diseñada para escalar. Previendo un escenario con cantidad creciente de usuarios operando simultáneamente, el servicio debe poder ser replicado horizontalmente para poder soportar la carga aumentada de usuarios.
+    \item \textbf{Usabilidad (Usability) --- tercerizado:} El fundador de arVault tercerizó el desarrollo de las aplicaciones móviles, por lo que la usabilidad del frontend queda fuera del alcance directo de este análisis. Se menciona por su importancia, pero no es objetivo de las tácticas a implementar en este trabajo.
 \end{itemize}
 
 \subsection{Crítica a las Decisiones de Diseño Originales}
@@ -20,8 +22,8 @@ La arquitectura y código del ``caso base'' presentan decisiones de diseño cues
 \begin{itemize}
     \item \textbf{Manejo del Estado y Confiabilidad (Reliability):} 
     El módulo \texttt{state.js} carga inicialmente todo el estado a memoria desde archivos locales JSON y emplea un ciclo \texttt{setInterval} cada 1 a 5 segundos (\texttt{scheduleSave}) para reescribir el archivo entero de forma asincrónica. Si el contenedor o el proceso muere de manera abrupta, las operaciones (\textit{exchanges}) realizadas desde la última escritura hasta el instante de la falla se pierden irremediablemente, rompiendo la confiabilidad del servicio y dejando perfiles inconsistentes.
-    \item \textbf{Condiciones de Carrera (\textit{Race conditions}):} 
-    En el código de \texttt{exchange.js}, el diseño de la asincronía está acoplado con chequeos inválidos. Por ejemplo, al evaluar \texttt{counterAccount\allowbreak.balance >= counterAmount}, se bloquea el hilo utilizando \texttt{await transfer(...)}. Si entran múltiples peticiones concurrentes antes de que finalicen las transferencias virtuales y se efectúen los respectivos \texttt{baseAccount\allowbreak.balance += ...} y \texttt{-=}, el sistema permitirá ejecutar \textit{exchanges} con fondos insuficientes, violando reglas de dominio críticas de consistencia y seguridad.
+    \item \textbf{Seguridad (Security):}
+    En el código de \texttt{exchange.js}, el diseño de la asincronía introduce condiciones de carrera (\textit{race conditions}) que comprometen la integridad financiera del sistema. Al evaluar \texttt{counterAccount\allowbreak.balance >= counterAmount} y luego bloquear el hilo con \texttt{await transfer(...)}, múltiples peticiones concurrentes pueden superar la validación de saldo simultáneamente antes de que se actualicen los balances. El resultado es que el sistema permite ejecutar \textit{exchanges} con fondos insuficientes, violando reglas de dominio críticas de consistencia y seguridad.
     \item \textbf{Escalabilidad:} 
     El estado dependiente de la memoria de la aplicación en nodo y la escritura de archivos simples dentro del propio contenedor, rompe uno de los pilares de arquitecturas en la nube (stateless). Al no poseer un mecanismo de sincronía centralizado (como una base de datos ACID), es imposible desplegar y sincronizar múltiples instancias de la aplicación (escalamiento horizontal) tras un balanceador de carga. Cada instancia trabajará con un estado divergente de balances.
     \item \textbf{Testabilidad (Testability) y Modificabilidad:} 
@@ -34,26 +36,3 @@ La arquitectura y código del ``caso base'' presentan decisiones de diseño cues
 Para evidenciar el comportamiento de los atributos de \textbf{Performance} sobre la arquitectura base, se vuelve indispensable contar con métricas precisas. Tal como se puede apreciar en la Sección \ref{sec:metricas}, al ejecutar una prueba de carga sobre el endpoint de consultas (\texttt{GET /rates}), el sistema denota una latencia mediana excelente ($\sim 3$ ms, $p99$ de $13.1$ ms) y una tasa de respuesta estable, ya que es una mera consulta a la memoria (operación no bloqueante y sin I/O pesado).
 
 Aun así, este comportamiento favorable es dependiente de que las operaciones no transaccionen (como \texttt{/exchange}).
-
-\subsection{Mejoras implementadas (Layered Architecture)}
-\label{subsec:mejoras-aplicadas}
-
-Se ha introducido un refactor completo del servicio pasando de un \textbf{Monolito Acoplado} a una \textbf{Arquitectura en Capas (Layered Architecture)}. Esta alteración mejora contundentemente los atributos de \textbf{Modificabilidad} y \textbf{Testabilidad}, separando las responsabilidades de enrutamiento (Controllers), lógica de dominio (Services) y persistencia (Repositories).
-
-No obstante, esta reestructuración lógica \textbf{no soluciona los problemas de fondo en Escalabilidad y Confiabilidad}. Si bien ahora la persistencia está abstraída en el `stateManager`, los datos siguen viviendo en memoria e impactándose asincrónicamente mediante `fs` en JSON locales.
-
-\subsection{Modificaciones Propuestas (Tácticas y Trade-offs)}
-\label{subsec:tacticas}
-
-Para solucionar verdaderamente los desperfectos de los QA clave (Confiabilidad y Escalabilidad), proponemos dos líneas de modificación basadas en tácticas arquitectónicas concretas que pueden insertarse fácilmente gracias a la nueva capa de Repositorios:
-
-\begin{enumerate}
-    \item \textbf{Externalización del Estado (Data Abstraction y Transaction Management):} 
-    Modificar el mecanismo interno de los \texttt{Repositories} para consumir un servicio externo en tiempo real (Base de Datos Redis/Mongo o Relacional). Esto aislará el estado y volverá a los contenedores Node.js \textit{Stateless}.
-    \item \textbf{Escalamiento Horizontal y Balanceo (Concurrency y Multiple Instances):}
-    Una vez resuelto el estado externalizado, en la infraestructura se propondrá habilitar nodos en \textit{Nginx} como Reverse Proxy de modo que el trabajo se distribuya sobre múltiples réplicas (\textit{Round-Robin}).
-\end{enumerate}
-
-\subsubsection{Impacto y Trade-offs a constatar}
-
-\textit{[NOTA: Aquí se colocaría de qué manera el cambio de DB alteró la latencia sobre el endpoint /exchange o /rates. Con pruebas sobre el endpoint /exchange, con el escenario "exchange.yaml", incluirlas frente a las nuevas de DB y analizar el trade-off "Latencia vs Consistencia/Escalabilidad".]}
