@@ -14,22 +14,6 @@ Considerando la naturaleza financiera y transaccional del servicio provisto (\te
     \item \textbf{Usabilidad (Usability) --- tercerizado:} El fundador de arVault tercerizó el desarrollo de las aplicaciones móviles, por lo que la usabilidad del frontend queda fuera del alcance directo de este análisis. Se menciona por su importancia, pero no es objetivo de las tácticas a implementar en este trabajo.
 \end{itemize}
 
-\subsection{Crítica a las Decisiones de Diseño Originales}
-\label{subsec:critica-diseno}
-
-La arquitectura y código del ``caso base'' presentan decisiones de diseño cuestionables desde el punto de vista arquitectónico, las cuales impactan drásticamente en los QAs:
-
-\begin{itemize}
-    \item \textbf{Manejo del Estado y Confiabilidad (Reliability):} 
-    El módulo \texttt{state.js} carga inicialmente todo el estado a memoria desde archivos locales JSON y emplea un ciclo \texttt{setInterval} cada 1 a 5 segundos (\texttt{scheduleSave}) para reescribir el archivo entero de forma asincrónica. Si el contenedor o el proceso muere de manera abrupta, las operaciones (\textit{exchanges}) realizadas desde la última escritura hasta el instante de la falla se pierden irremediablemente, rompiendo la confiabilidad del servicio y dejando perfiles inconsistentes.
-    \item \textbf{Seguridad (Security):}
-    En el código de \texttt{exchange.js}, el diseño de la asincronía introduce condiciones de carrera (\textit{race conditions}) que comprometen la integridad financiera del sistema. Al evaluar \texttt{counterAccount\allowbreak.balance >= counterAmount} y luego bloquear el hilo con \texttt{await transfer(...)}, múltiples peticiones concurrentes pueden superar la validación de saldo simultáneamente antes de que se actualicen los balances. El resultado es que el sistema permite ejecutar \textit{exchanges} con fondos insuficientes, violando reglas de dominio críticas de consistencia y seguridad.
-    \item \textbf{Escalabilidad:} 
-    El estado dependiente de la memoria de la aplicación en nodo y la escritura de archivos simples dentro del propio contenedor, rompe uno de los pilares de arquitecturas en la nube (stateless). Al no poseer un mecanismo de sincronía centralizado (como una base de datos ACID), es imposible desplegar y sincronizar múltiples instancias de la aplicación (escalamiento horizontal) tras un balanceador de carga. Cada instancia trabajará con un estado divergente de balances.
-    \item \textbf{Testabilidad (Testability) y Modificabilidad:} 
-    El alto acoplamiento y el almacenamiento manual limitan fuertemente la escritura de pruebas aisladas, limitándose el sistema a un escenario fraccionario. 
-\end{itemize}
-
 \subsection{Desempeño y Pruebas de Carga del Caso Base}
 \label{subsec:pruebas-base}
 
