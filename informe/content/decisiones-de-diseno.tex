@@ -41,11 +41,12 @@ Si bien en teoría la nueva arquitectura introduce más niveles de indirección 
 
 \subsection{Variables en memoria}
 
-\begin{center}
+\begin{figure}[htbp]
+\centering
 \includegraphics[width=\textwidth]{images/redis component and connectors.png}
 \captionof{diagrama}{Arquitectura con Redis como almacenamiento centralizado. Las tres decisiones de diseño que siguen —variables en memoria, persistencia lazy y persistencia en archivos JSON— fueron resueltas todas juntas mediante la incorporación de Redis. El \textbf{State Manager} ya no persiste en archivos locales sino que delega en Redis, que actúa como fuente de verdad única y compartida entre todas las instancias.}
 \label{diag:arquitectura_redis}
-\end{center}
+\end{figure}
 
 Accounts, rates y log son variables JavaScript dentro del proceso. Leer es instantáneo (bueno para \textit{performance}), pero hace imposible escalar horizontalmente porque cada instancia tendría su propio estado desincronizado. Además genera una \textit{race condition}: dos requests concurrentes pueden leer el mismo balance, pasar ambos el check de fondos, y producir doble gasto.
 
