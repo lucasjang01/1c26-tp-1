@@ -167,17 +167,6 @@ Cada uno de los 3 workload models se ejecutará sobre cada uno de los siguientes
     \end{itemize}
 \end{itemize}
 
-\subsection{Criterios de Éxito de Esta Fase}
-
-La fase de medición se considera completa cuando:
-
-\begin{enumerate}[leftmargin=*]
-    \item Existen escenarios Artillery que ejercen los 3 endpoints críticos (\texttt{rates}, \texttt{exchange}, mixto).
-    \item La aplicación emite métricas propias que llegan a Grafana.
-    \item El dashboard de Grafana incluye al menos: p95/p99 de latencia, success/failure de exchange por motivo, event loop lag, heap usage, tamaño del log.
-    \item Hay un baseline capturado de los 5 workload models $\times$ 3 escenarios que puede re-ejecutarse de forma reproducible.
-    \item El informe de baseline documenta al menos: latencias por escenario, punto de quiebre, evidencia del memory leak, evidencia de la race condition.
-\end{enumerate}
 
 \subsection{Análisis de resultados}
 
@@ -194,22 +183,22 @@ Esta sección resume los resultados obtenidos en las ejecuciones de `baseline`, 
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/rates/Baseline rates/scenarios.jpeg}
-\captionof{diagrama}{Gráfica de escenarios - Baseline - rates}
+\captionof{imagen}{Gráfica de escenarios - Baseline - rates}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/rates/Baseline rates/request_state.jpeg}
-\captionof{diagrama}{Gráfica de estado de solicitudes - Baseline - rates}
+\captionof{imagen}{Gráfica de estado de solicitudes - Baseline - rates}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/rates/Baseline rates/response.jpeg}
-\captionof{diagrama}{Gráfica de respuestas - Baseline - rates}
+\captionof{imagen}{Gráfica de respuestas - Baseline - rates}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/rates/Baseline rates/resources.jpeg}
-\captionof{diagrama}{Gráfica de recursos - Baseline - rates}
+\captionof{imagen}{Gráfica de recursos - Baseline - rates}
 \end{center}
 
 \paragraph{Load}
@@ -221,22 +210,22 @@ Esta sección resume los resultados obtenidos en las ejecuciones de `baseline`, 
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/rates/load Rates/scenarios.jpeg}
-\captionof{diagrama}{Gráfica de escenarios - Load - rates}
+\captionof{imagen}{Gráfica de escenarios - Load - rates}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/rates/load Rates/requests.jpeg}
-\captionof{diagrama}{Gráfica de estado de solicitudes - Load - rates}
+\captionof{imagen}{Gráfica de estado de solicitudes - Load - rates}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/rates/load Rates/response.jpeg}
-\captionof{diagrama}{Gráfica de respuestas - Load - rates}
+\captionof{imagen}{Gráfica de respuestas - Load - rates}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/rates/load Rates/resources.jpeg}
-\captionof{diagrama}{Gráfica de recursos - Load - rates}
+\captionof{imagen}{Gráfica de recursos - Load - rates}
 \end{center}
 
 \paragraph{Stress}
@@ -248,22 +237,22 @@ Esta sección resume los resultados obtenidos en las ejecuciones de `baseline`, 
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/rates/stress_rate/scenarios.jpeg}
-\captionof{diagrama}{Gráfica de escenarios - Stress - rates}
+\captionof{imagen}{Gráfica de escenarios - Stress - rates}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/rates/stress_rate/requests.jpeg}
-\captionof{diagrama}{Gráfica de estado de solicitudes - Stress - rates}
+\captionof{imagen}{Gráfica de estado de solicitudes - Stress - rates}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/rates/stress_rate/response.jpeg}
-\captionof{diagrama}{Gráfica de respuestas - Stress - rates}
+\captionof{imagen}{Gráfica de respuestas - Stress - rates}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/rates/stress_rate/resources.jpeg}
-\captionof{diagrama}{Gráfica de recursos - Stress - rates}
+\captionof{imagen}{Gráfica de recursos - Stress - rates}
 \end{center}
 
 \paragraph{Conclusión}
@@ -283,22 +272,22 @@ Endpoint robusto y de baja latencia; no es el cuello de botella.
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/exchange/baseline/scenarios.jpeg}
-\captionof{diagrama}{Gráfica de escenarios - Baseline - exchange}
+\captionof{imagen}{Gráfica de escenarios - Baseline - exchange}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/exchange/baseline/requests.jpeg}
-\captionof{diagrama}{Gráfica de estado de solicitudes - Baseline - exchange}
+\captionof{imagen}{Gráfica de estado de solicitudes - Baseline - exchange}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/exchange/baseline/response.jpeg}
-\captionof{diagrama}{Gráfica de respuestas - Baseline - exchange}
+\captionof{imagen}{Gráfica de respuestas - Baseline - exchange}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/exchange/baseline/resources.jpeg}
-\captionof{diagrama}{Gráfica de recursos - Baseline - exchange}
+\captionof{imagen}{Gráfica de recursos - Baseline - exchange}
 \end{center}
 
 \paragraph{Load}
@@ -310,22 +299,22 @@ Endpoint robusto y de baja latencia; no es el cuello de botella.
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/exchange/load/scenarios.jpeg}
-\captionof{diagrama}{Gráfica de escenarios - Load - exchange}
+\captionof{imagen}{Gráfica de escenarios - Load - exchange}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/exchange/load/requests.jpeg}
-\captionof{diagrama}{Gráfica de estado de solicitudes - Load - exchange}
+\captionof{imagen}{Gráfica de estado de solicitudes - Load - exchange}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/exchange/load/response.jpeg}
-\captionof{diagrama}{Gráfica de respuestas - Load - exchange}
+\captionof{imagen}{Gráfica de respuestas - Load - exchange}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/exchange/load/resources.jpeg}
-\captionof{diagrama}{Gráfica de recursos - Load - exchange}
+\captionof{imagen}{Gráfica de recursos - Load - exchange}
 \end{center}
 
 \paragraph{Stress}
@@ -337,22 +326,22 @@ Endpoint robusto y de baja latencia; no es el cuello de botella.
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/exchange/stress/scenarios.jpeg}
-\captionof{diagrama}{Gráfica de escenarios - Stress - exchange}
+\captionof{imagen}{Gráfica de escenarios - Stress - exchange}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/exchange/stress/requests.jpeg}
-\captionof{diagrama}{Gráfica de estado de solicitudes - Stress - exchange}
+\captionof{imagen}{Gráfica de estado de solicitudes - Stress - exchange}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/exchange/stress/response.jpeg}
-\captionof{diagrama}{Gráfica de respuestas - Stress - exchange}
+\captionof{imagen}{Gráfica de respuestas - Stress - exchange}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/exchange/stress/resources.jpeg}
-\captionof{diagrama}{Gráfica de recursos - Stress - exchange}
+\captionof{imagen}{Gráfica de recursos - Stress - exchange}
 \end{center}
 
 \paragraph{Conclusión}
@@ -370,22 +359,22 @@ Es el cuello de botella. Su latencia base ($\sim$600 ms) combinada con la natura
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/mixed/baseline/scenarios.jpeg}
-\captionof{diagrama}{Gráfica de escenarios - Baseline - mixed}
+\captionof{imagen}{Gráfica de escenarios - Baseline - mixed}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/mixed/baseline/requests.jpeg}
-\captionof{diagrama}{Gráfica de estado de solicitudes - Baseline - mixed}
+\captionof{imagen}{Gráfica de estado de solicitudes - Baseline - mixed}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/mixed/baseline/response.jpeg}
-\captionof{diagrama}{Gráfica de respuestas - Baseline - mixed}
+\captionof{imagen}{Gráfica de respuestas - Baseline - mixed}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/mixed/baseline/resources.jpeg}
-\captionof{diagrama}{Gráfica de recursos - Baseline - mixed}
+\captionof{imagen}{Gráfica de recursos - Baseline - mixed}
 \end{center}
 
 \paragraph{Load}
@@ -397,22 +386,22 @@ Es el cuello de botella. Su latencia base ($\sim$600 ms) combinada con la natura
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/mixed/load/scenarios.jpeg}
-\captionof{diagrama}{Gráfica de escenarios - Load - mixed}
+\captionof{imagen}{Gráfica de escenarios - Load - mixed}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/mixed/load/requests.jpeg}
-\captionof{diagrama}{Gráfica de estado de solicitudes - Load - mixed}
+\captionof{imagen}{Gráfica de estado de solicitudes - Load - mixed}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/mixed/load/response.jpeg}
-\captionof{diagrama}{Gráfica de respuestas - Load - mixed}
+\captionof{imagen}{Gráfica de respuestas - Load - mixed}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/mixed/load/resources.jpeg}
-\captionof{diagrama}{Gráfica de recursos - Load - mixed}
+\captionof{imagen}{Gráfica de recursos - Load - mixed}
 \end{center}
 
 \paragraph{Stress}
@@ -424,22 +413,22 @@ Es el cuello de botella. Su latencia base ($\sim$600 ms) combinada con la natura
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/mixed/stress/scenarios.jpeg}
-\captionof{diagrama}{Gráfica de escenarios - Stress - mixed}
+\captionof{imagen}{Gráfica de escenarios - Stress - mixed}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/mixed/stress/requests.jpeg}
-\captionof{diagrama}{Gráfica de estado de solicitudes - Stress - mixed}
+\captionof{imagen}{Gráfica de estado de solicitudes - Stress - mixed}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/mixed/stress/response.jpeg}
-\captionof{diagrama}{Gráfica de respuestas - Stress - mixed}
+\captionof{imagen}{Gráfica de respuestas - Stress - mixed}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase1/mixed/stress/resources.jpeg}
-\captionof{diagrama}{Gráfica de recursos - Stress - mixed}
+\captionof{imagen}{Gráfica de recursos - Stress - mixed}
 \end{center}
 
 \paragraph{Conclusión}
@@ -556,22 +545,22 @@ Aunque JavaScript no tiene multithreading verdadero, el evento de \texttt{schedu
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase2/rates/load/scenarios.jpeg}
-\captionof{diagrama}{Gráfica de escenarios - Load - rates}
+\captionof{imagen}{Gráfica de escenarios - Load - rates}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase2/rates/load/requests.jpeg}
-\captionof{diagrama}{Gráfica de estado de solicitudes - Load - rates}
+\captionof{imagen}{Gráfica de estado de solicitudes - Load - rates}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase2/rates/load/response.jpeg}
-\captionof{diagrama}{Gráfica de respuestas - Load - rates}
+\captionof{imagen}{Gráfica de respuestas - Load - rates}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase2/rates/load/resources.jpeg}
-\captionof{diagrama}{Gráfica de recursos - Load - rates}
+\captionof{imagen}{Gráfica de recursos - Load - rates}
 \end{center}
 
 \paragraph{Escenario exchange}
@@ -584,22 +573,22 @@ Aunque JavaScript no tiene multithreading verdadero, el evento de \texttt{schedu
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase2/exchange/load/scenarios.jpeg}
-\captionof{diagrama}{Gráfica de escenarios - Load - exchange}
+\captionof{imagen}{Gráfica de escenarios - Load - exchange}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase2/exchange/load/requests.jpeg}
-\captionof{diagrama}{Gráfica de estado de solicitudes - Load - exchange}
+\captionof{imagen}{Gráfica de estado de solicitudes - Load - exchange}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase2/exchange/load/response.jpeg}
-\captionof{diagrama}{Gráfica de respuestas - Load - exchange}
+\captionof{imagen}{Gráfica de respuestas - Load - exchange}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase2/exchange/load/resources.jpeg}
-\captionof{diagrama}{Gráfica de recursos - Load - exchange}
+\captionof{imagen}{Gráfica de recursos - Load - exchange}
 \end{center}
 
 \paragraph{Escenario mixed}
@@ -612,22 +601,22 @@ Aunque JavaScript no tiene multithreading verdadero, el evento de \texttt{schedu
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase2/mixed/load/scenarios.jpeg}
-\captionof{diagrama}{Gráfica de escenarios - Load - mixed}
+\captionof{imagen}{Gráfica de escenarios - Load - mixed}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase2/mixed/load/requests.jpeg}
-\captionof{diagrama}{Gráfica de estado de solicitudes - Load - mixed}
+\captionof{imagen}{Gráfica de estado de solicitudes - Load - mixed}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase2/mixed/load/response.jpeg}
-\captionof{diagrama}{Gráfica de respuestas - Load - mixed}
+\captionof{imagen}{Gráfica de respuestas - Load - mixed}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase2/mixed/load/resources.jpeg}
-\captionof{diagrama}{Gráfica de recursos - Load - mixed}
+\captionof{imagen}{Gráfica de recursos - Load - mixed}
 \end{center}
 
 
@@ -662,22 +651,22 @@ Aunque JavaScript no tiene multithreading verdadero, el evento de \texttt{schedu
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase3/exchange/load/scenarios.jpeg}
-\captionof{diagrama}{Gráfica de escenarios - Load - exchange}
+\captionof{imagen}{Gráfica de escenarios - Load - exchange}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase3/exchange/load/requests.jpeg}
-\captionof{diagrama}{Gráfica de estado de solicitudes - Load - exchange}
+\captionof{imagen}{Gráfica de estado de solicitudes - Load - exchange}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase3/exchange/load/response.jpeg}
-\captionof{diagrama}{Gráfica de respuestas - Load - exchange}
+\captionof{imagen}{Gráfica de respuestas - Load - exchange}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase3/exchange/load/resources.jpeg}
-\captionof{diagrama}{Gráfica de recursos - Load - exchange}
+\captionof{imagen}{Gráfica de recursos - Load - exchange}
 \end{center}
 
 \paragraph{exchange -- Stress}
@@ -690,22 +679,22 @@ Aunque JavaScript no tiene multithreading verdadero, el evento de \texttt{schedu
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase3/exchange/stress/scenarios.jpeg}
-\captionof{diagrama}{Gráfica de escenarios - Stress - exchange}
+\captionof{imagen}{Gráfica de escenarios - Stress - exchange}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase3/exchange/stress/requests.jpeg}
-\captionof{diagrama}{Gráfica de estado de solicitudes - Stress - exchange}
+\captionof{imagen}{Gráfica de estado de solicitudes - Stress - exchange}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase3/exchange/stress/response.jpeg}
-\captionof{diagrama}{Gráfica de respuestas - Stress - exchange}
+\captionof{imagen}{Gráfica de respuestas - Stress - exchange}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase3/exchange/stress/resources.jpeg}
-\captionof{diagrama}{Gráfica de recursos - Stress - exchange}
+\captionof{imagen}{Gráfica de recursos - Stress - exchange}
 \end{center}
 
 \paragraph{mixed -- Load}
@@ -718,22 +707,22 @@ Aunque JavaScript no tiene multithreading verdadero, el evento de \texttt{schedu
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase3/mixed/load/scenarios.jpeg}
-\captionof{diagrama}{Gráfica de escenarios - Load - mixed}
+\captionof{imagen}{Gráfica de escenarios - Load - mixed}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase3/mixed/load/requests.jpeg}
-\captionof{diagrama}{Gráfica de estado de solicitudes - Load - mixed}
+\captionof{imagen}{Gráfica de estado de solicitudes - Load - mixed}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase3/mixed/load/response.jpeg}
-\captionof{diagrama}{Gráfica de respuestas - Load - mixed}
+\captionof{imagen}{Gráfica de respuestas - Load - mixed}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase3/mixed/load/resources.jpeg}
-\captionof{diagrama}{Gráfica de recursos - Load - mixed}
+\captionof{imagen}{Gráfica de recursos - Load - mixed}
 \end{center}
 
 \paragraph{mixed -- Stress}
@@ -746,22 +735,22 @@ Aunque JavaScript no tiene multithreading verdadero, el evento de \texttt{schedu
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase3/mixed/stress/scenarios.jpeg}
-\captionof{diagrama}{Gráfica de escenarios - Stress - mixed}
+\captionof{imagen}{Gráfica de escenarios - Stress - mixed}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase3/mixed/stress/requests.jpeg}
-\captionof{diagrama}{Gráfica de estado de solicitudes - Stress - mixed}
+\captionof{imagen}{Gráfica de estado de solicitudes - Stress - mixed}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase3/mixed/stress/response.jpeg}
-\captionof{diagrama}{Gráfica de respuestas - Stress - mixed}
+\captionof{imagen}{Gráfica de respuestas - Stress - mixed}
 \end{center}
 
 \begin{center}
 \includegraphics[width=\textwidth]{images/fase3/mixed/stress/resources.jpeg}
-\captionof{diagrama}{Gráfica de recursos - Stress - mixed}
+\captionof{imagen}{Gráfica de recursos - Stress - mixed}
 \end{center}
 
 \subsubsection{Comparación con Fase B}
@@ -860,95 +849,6 @@ Lo medido confirma que el cuello de botella original era:
 
 Las acciones realizadas en \textbf{Fase B} (Redis, capas, healthcheck) eliminaron fallos de persistencia y mejoraron la estabilidad. Las de \textbf{Fase C} (réplicas) resolvieron la saturación al distribuir la carga, reduciendo timeouts y mejorando percentiles de latencia en todo el sistema.
 
-
-\subsection{Formato de las respuestas}
-
-Para cada escenario se listan los workload models y a la pregunta asociada se responde con las métricas clave: requests, rps (aprox.), p50, p95, p99 y número de fallos. Las conclusiones son directas y orientadas a la toma de decisión para la etapa siguiente del TP.
-
-\subsection{Escenario \texttt{rates} (GET /rates)}
-
-\subsubsection{Baseline}
-\textbf{Pregunta:} ¿Cuál es el comportamiento del sistema bajo carga mínima?
-
-\textbf{Resultado:} requests=390, rps$\approx$4, p50=2 ms, p95=80.6 ms, p99=113.3 ms, fallos=0.
-
-\textbf{Respuesta:} Bajo carga mínima el endpoint responde muy rápido (mediana 2 ms) y sin errores.
-
-\subsubsection{Load}
-\textbf{Pregunta:} ¿Cómo se comporta bajo carga esperada (ramp $\rightarrow$ 20 rps)?
-
-\textbf{Resultado:} requests=7260, rps$\approx$17, p50=2 ms, p95=25.8 ms, p99=67.4 ms, fallos=0.
-
-\textbf{Respuesta:} A 17–20 rps sostenidos el servicio mantiene latencias muy bajas y sin errores — comportamiento estable.
-
-\subsubsection{Stress}
-\textbf{Pregunta:} ¿Cuál es la capacidad máxima antes de degradarse?
-
-\textbf{Resultado:} requests=45900, rps$\approx$77, p50=3 ms, p95=122.7 ms, p99=179.5 ms, fallos=0.
-
-\textbf{Respuesta:} \texttt{rates} escala bien hasta los niveles de stress probados (promedio $\sim$77 rps en la ejecución). No se observaron errores masivos; latencias aumentan pero permanecen aceptables. Punto de ruptura para \texttt{rates} no fue alcanzado en estas pruebas (soporta 200 rps escalonados en la configuración probada sin errores).
-
-\subsubsection{Conclusión \texttt{rates}}
-Endpoint robusto y de baja latencia; no es el cuello de botella.
-
-\textbf{Paneles recomendados para evidencia:} ``Scenarios launched'', ``Requests / sec'', ``Response time (p95/p99)''.
-
-\subsection{Escenario \texttt{exchange} (POST /exchange)}
-
-\subsubsection{Baseline}
-\textbf{Pregunta:} ¿Cuál es el comportamiento del sistema bajo carga mínima?
-
-\textbf{Resultado:} requests=180, rps=1, p50$\approx$596 ms, p95$\approx$727.9 ms, p99$\approx$772.9 ms, fallos=0.
-
-\textbf{Respuesta:} Incluso en baseline el endpoint tiene latencia alta ($\approx$600 ms mediana) atribuible a la lógica de negocio simulada (mock \texttt{transfer()}).
-
-\subsubsection{Load}
-\textbf{Pregunta:} ¿Cómo se comporta bajo carga esperada (20 rps)?
-
-\textbf{Resultado:} requests=7260, rps$\approx$17, p50$\approx$620.3 ms, p95$\approx$757.6 ms, p99$\approx$820.7 ms, fallos=0.
-
-\textbf{Respuesta:} A 17–20 rps la mediana/percentiles se mantienen en el rango de cientos de ms; aunque en este experimento no se reportan fallos masivos, la cola y latencia se elevan notablemente comparado con \texttt{rates}.
-
-\subsubsection{Stress}
-\textbf{Pregunta:} ¿Cuál es la capacidad máxima antes de degradarse?
-
-\textbf{Resultado:} requests=46200, rps$\approx$77; vusers.failed=11601; errores principales: \texttt{ERR\_SOCKET\_TIMEOUT}$\approx$10467, \texttt{ECONNRESET}$\approx$1134, http.5xx$\approx$52; p95$\approx$3905.8 ms, p99$\approx$7407.5 ms.
-
-\textbf{Respuesta:} Bajo stress el endpoint se degrada gravemente: aparecen timeouts y resets, con altas latencias (segundos). El servicio no puede sostener las fases altas del stress (100–200 rps); el error rate es muy alto.
-
-\subsubsection{Conclusión \texttt{exchange}}
-Es el cuello de botella. Su latencia base ($\sim$600 ms) combinada con la naturaleza síncrona produce colas y timeouts bajo carga elevada. Requiere optimizaciones (p. ej. reducir latencia del \texttt{transfer}, externalizar estado, añadir réplicas, o limitar tasa de entrada).
-
-\textbf{Paneles recomendados:} ``Response time - exchange'' (p95/p99), ``Errors - artillery-api / exchange'', ``Container CPU / Mem (exchange-api-1)''.
-
-\subsection{Escenario \texttt{mixed} (mix 60\% rates / 30\% exchange / 5\% accounts / 5\% log)}
-
-\subsubsection{Baseline}
-\textbf{Pregunta:} ¿Cuál es el comportamiento del sistema bajo carga mínima en un perfil realista?
-
-\textbf{Resultado:} requests=720, rps$\approx$4, p50=3 ms, p95$\approx$685.5 ms, p99$\approx$742.6 ms, fallos=0.
-
-\textbf{Respuesta:} La mediana es baja (por predominio de \texttt{rates}) pero los percentiles altos reflejan el impacto de los exchanges (p95 $\approx$ 685 ms).
-
-\subsubsection{Load}
-\textbf{Pregunta:} ¿Cómo se comporta bajo carga esperada (ramp $\rightarrow$ 20 rps total)?
-
-\textbf{Resultado:} requests=29040, rps$\approx$69 (total mixto), p50$\approx$49.9 ms, p95$\approx$837.3 ms, p99$\approx$1249.1 ms, fallos=0.
-
-\textbf{Respuesta:} Con mezcla realista la latencia se eleva (p95 cercano a 0.8–1.2 s). No hay fallos masivos en la carga de prueba \texttt{load}, pero la degradación de experiencia es evidente.
-
-\subsubsection{Stress}
-\textbf{Pregunta:} ¿Cuál es la capacidad máxima antes de degradarse en tráfico mixto?
-
-\textbf{Resultado:} requests=76751, rps$\approx$77; http.codes.200$\approx$37393, vusers.failed$\approx$39321, \\ errores \texttt{ERR\_SOCKET\_TIMEOUT}$\approx$38920, \texttt{ECONNRESET}$\approx$401, http.5xx$\approx$97; p95$\approx$7407.5 ms, p99$\approx$8186.6 ms.
-
-\textbf{Respuesta:} En stress combinado el sistema falla de forma masiva (tiempos de respuesta en segundos y tasas de fallo muy altas). La combinación de operaciones rápidas y lentas agrava la congestión.
-
-\subsubsection{Conclusión \texttt{mixed}}
-El comportamiento es dominado por el \texttt{exchange} bajo carga. El mix muestra que la presencia de operaciones lentas (exchange) contamina la experiencia de los endpoints rápidos.
-
-\textbf{Paneles recomendados:} ``Mixed - Requests / sec'', ``Mixed - Response time (p95/p99)'', ``Errors by endpoint'', ``Host CPU/Mem''.
-
 \subsection{Métricas de Negocio: Volumen Operado y Neto por Moneda}
 \label{subsec:metricas-negocio}
 
@@ -1015,14 +915,14 @@ Las capturas fueron tomadas durante dos workloads del escenario \texttt{exchange
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.85\textwidth]{images/volume-metrics-exchange-baseline.png}
-    \caption{Volumen operado y neto por moneda durante \texttt{exchange baseline} (1 req/s durante 3 min). El crecimiento es suave y proporcional a los pesos de los flujos configurados.}
+    \captionof{imagen}{Volumen operado y neto por moneda durante \texttt{exchange baseline} (1 req/s durante 3 min). El crecimiento es suave y proporcional a los pesos de los flujos configurados.}
     \label{fig:volume-baseline}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.85\textwidth]{images/volume-metrics-exchange-stress.png}
-    \caption{Volumen operado y neto por moneda durante \texttt{exchange stress} (escalera 10$\rightarrow$25$\rightarrow$50 req/s). El volumen crece significativamente más rápido; la desaceleración en los escalones altos refleja la degradación del servicio bajo carga.}
+    \captionof{imagen}{Volumen operado y neto por moneda durante \texttt{exchange stress} (escalera 10$\rightarrow$25$\rightarrow$50 req/s). El volumen crece significativamente más rápido; la desaceleración en los escalones altos refleja la degradación del servicio bajo carga.}
     \label{fig:volume-stress}
 \end{figure}
 
@@ -1038,17 +938,6 @@ Las capturas fueron tomadas durante dos workloads del escenario \texttt{exchange
 \subsubsection{Impacto en los atributos de calidad}
 
 \begin{itemize}[leftmargin=*]
-    \item \textbf{Visibilidad} $\uparrow\uparrow$: el sistema ahora emite señales de dominio que no estaban disponibles. Un operador puede detectar desequilibrios de liquidez en tiempo real sin necesidad de consultar el log de transacciones.
+    \item \textbf{Visibilidad} (impacto positivo): el sistema ahora emite señales de dominio que no estaban disponibles. Un operador puede detectar desequilibrios de liquidez en tiempo real sin necesidad de consultar el log de transacciones.
     \item \textbf{Performance} (sin impacto negativo): la emisión de métricas vía UDP (protocolo de StatsD) es no bloqueante y no agrega latencia perceptible al path crítico del exchange.
 \end{itemize}
-
-\subsection{Recomendaciones generales (prioritizadas)}
-
-\begin{enumerate}[leftmargin=*]
-    \item \textbf{Reducir latencia de \texttt{exchange} (alto impacto):} revisar la implementación de \texttt{transfer()} (actual mock 200–400 ms), usar operaciones asíncronas no bloqueantes y/o externalizar latencia (worker, cola, microservicio). Esto reduce la base de latencia y la cola acumulada.
-    \item \textbf{Escalado horizontal:} añadir réplicas del API y balancear (nginx) para repartir carga de requests concurrentes.
-    \item \textbf{Persistencia rápida (Redis):} mover \texttt{state.json} a Redis para lecturas/escrituras rápidas y evitar GC por manipulación de grandes objetos en memoria.
-    \item \textbf{Bounded queues y circuit breakers:} rechazar solicitudes cuando el sistema alcanza un umbral para evitar colas infinitas y cascade fail.
-    \item \textbf{Tuning de timeouts/keepalive en nginx y clientes:} reducir resets y reintentos innecesarios.
-    \item \textbf{Instrumentación adicional:} emitir métricas internas (counters de éxito/fallo por endpoint) para correlacionar con Artillery y cAdvisor.
-\end{enumerate}
