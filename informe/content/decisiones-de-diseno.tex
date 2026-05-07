@@ -14,6 +14,8 @@ El \textbf{Exchange Service} accede directamente a referencias internas del \tex
 
 Además, el \textbf{API Server} mezcla responsabilidades: realiza validación de input, invoca la lógica de negocio y decide el formato de respuesta todo en el mismo handler, sin delegar al \textbf{Exchange Service} de forma limpia.
 
+\subsubsection{Mejora propuesta}
+
 La arquitectura propuesta introduce una separación en capas con responsabilidades bien delimitadas. El \textbf{API Server} delega cada request a uno de cuatro controladores especializados: \textbf{Account Controller}, \textbf{Rate Controller}, \textbf{Exchange Controller} y \textbf{Log Controller}, que se encargan exclusivamente de la validación de input y el mapeo de respuestas HTTP. Cada controlador invoca a su correspondiente servicio de dominio (\textbf{Account Service}, \textbf{Rate Service}, \textbf{Exchange Service} y \textbf{Log Service}), donde reside la lógica de negocio. Los servicios acceden al estado únicamente a través de repositorios (\textbf{Account Repository}, \textbf{Rate Repository}, \textbf{Log Repository}), que exponen interfaces limpias y son los únicos componentes autorizados a interactuar con el \textbf{State Manager}. Este último centraliza toda la lectura y escritura a disco, persistiendo el estado en \texttt{accounts.json}, \texttt{rates.json} y \texttt{log.json}.
 
 \begin{center}
@@ -39,16 +41,61 @@ Si bien en teoría la nueva arquitectura introduce más niveles de indirección 
 
 \subsection{Variables en memoria}
 
-Accounts, rates y log son variables JavaScript dentro del proceso. Leer es instantáneo (bueno para performance), pero hace imposible escalar horizontalmente porque cada instancia tendría su propio estado desincronizado. Además genera la race condition: dos requests concurrentes pueden leer el mismo balance, pasar ambos el check de fondos, y producir doble gasto.
+\begin{center}
+\includegraphics[width=\textwidth]{images/redis component and connectors.png}
+\captionof{diagrama}{Arquitectura con Redis como almacenamiento centralizado. Las tres decisiones de diseño que siguen —variables en memoria, persistencia lazy y persistencia en archivos JSON— fueron resueltas todas juntas mediante la incorporación de Redis. El \textbf{State Manager} ya no persiste en archivos locales sino que delega en Redis, que actúa como fuente de verdad única y compartida entre todas las instancias.}
+\label{diag:arquitectura_redis}
+\end{center}
+
+Accounts, rates y log son variables JavaScript dentro del proceso. Leer es instantáneo (bueno para \textit{performance}), pero hace imposible escalar horizontalmente porque cada instancia tendría su propio estado desincronizado. Además genera una \textit{race condition}: dos requests concurrentes pueden leer el mismo balance, pasar ambos el check de fondos, y producir doble gasto.
+
+\subsubsection{Mejora propuesta}
+
+Dado que el estado en memoria hacía imposible la escalabilidad horizontal y generaba una \textit{race condition} que podía derivar en doble gasto, se decidió incorporar Redis como almacenamiento centralizado. De esta forma el estado deja de vivir dentro del proceso y pasa a una fuente de verdad única y compartida entre todas las instancias, eliminando la desincronización y permitiendo operaciones atómicas.
+
+\subsubsection{Atributos de calidad afectados}
+
+\paragraph{Scalability}
+El atributo más impactado. El estado deja de vivir dentro del proceso y pasa a un almacenamiento externo compartido. Antes era imposible levantar múltiples instancias porque cada una tendría su propio estado desincronizado; con Redis esto queda resuelto.
+
+\paragraph{Reliability}
+La race condition del doble gasto desaparece porque Redis permite operaciones atómicas, de modo que dos requests concurrentes ya no pueden leer el mismo balance y pasar ambas el check de fondos simultáneamente.
+
+\paragraph{Performance (atributo afectado negativamente)}
+Leer una variable en memoria es instantáneo, mientras que cada operación contra Redis implica una llamada de red. En la práctica esta latencia suele ser de un par de milisegundos y resulta aceptable, pero es un costo real que antes no existía.
 
 
 \subsection{Persistencia lazy}
 
 El estado se guarda a disco cada 1-5 segundos en lugar de en cada operación. Simplifica el código y no bloquea requests con I/O, pero si el proceso muere entre guardados se pierden transacciones, violación de durabilidad.
 
+\subsubsection{Mejora propuesta}
+
+Con la incorporacion de Redis, decidimos remover la persistencia lazy a disco. Redis se encarga de la durabilidad y persistencia de los datos, eliminando el riesgo de pérdida de transacciones en caso de caída del proceso.
+
+\subsubsection{Atributos de calidad afectados}
+
+\paragraph{Durability}
+La ventana de pérdida de datos que generaba el guardado cada 1-5 segundos desaparece. Si el proceso muere, las transacciones están garantizadas porque Redis las persistió antes de confirmarlas.
+
+\paragraph{Performance}
+Dependiendo del nivel de durabilidad que se configure en Redis, puede agregarse algo de latencia por operación. Es un costo generalmente aceptable frente a la garantía que ofrece, pero es un trade-off que hay que tener en cuenta.
+
 \subsection{Persistencia en archivos json}
 
 Todo vive en archivos JSON locales. Sin transacciones atómicas, sin estado compartible entre instancias, y con riesgo de corrupción si el archivo falla.
+
+\subsubsection{Mejora propuesta}
+
+Con la incorporación de Redis, se reemplazó completamente la persistencia en archivos JSON por un almacenamiento centralizado. Esto resuelve los problemas de falta de transacciones atómicas, imposibilidad de compartir estado entre instancias y riesgo de corrupción.
+
+\subsubsection{Atributos de calidad afectados}
+
+\paragraph{Reliability}
+El riesgo de corrupción de archivos ya no está. Redis maneja la integridad de los datos de forma mucho más robusta que un archivo JSON que puede quedar en estado inconsistente si el proceso muere en medio de una escritura.
+
+\paragraph{Availability}
+El sistema ahora depende de Redis como infraestructura adicional que hay que operar y monitorear. Si Redis no está disponible el sistema no funciona, introduciendo un nuevo punto de falla que antes no existía.
 
 
 \subsubsection{Función transfer() mockeada de forma secuencial}
