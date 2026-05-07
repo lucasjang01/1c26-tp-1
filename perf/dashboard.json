@@ -300,22 +300,20 @@
       "steppedLine": false,
       "targets": [
         {
-          "refCount": 0,
-          "refId": "C",
-          "target": "alias(stats.gauges.$server.scenarioDuration.max, 'Upper')"
+          "refId": "A",
+          "target": "alias(stats.gauges.$server.scenarioDuration.p50, 'p50')"
         },
         {
-          "refId": "D",
+          "refId": "B",
+          "target": "alias(stats.gauges.$server.scenarioDuration.p90, 'p90')"
+        },
+        {
+          "refId": "C",
           "target": "alias(stats.gauges.$server.scenarioDuration.p99, 'p99')"
         },
         {
-          "refId": "E",
-          "target": "alias(stats.gauges.$server.scenarioDuration.p95, 'p95')"
-        },
-        {
-          "refCount": 0,
-          "refId": "B",
-          "target": "alias(stats.gauges.$server.scenarioDuration.median, 'Median')"
+          "refId": "D",
+          "target": "alias(stats.gauges.$server.scenarioDuration.p999, 'p999')"
         }
       ],
       "thresholds": [],
@@ -484,7 +482,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 16
+        "y": 28
       },
       "id": 100,
       "targets": [
@@ -519,7 +517,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 16
+        "y": 28
       },
       "id": 101,
       "targets": [
@@ -581,8 +579,8 @@
         "allValue": null,
         "current": {
           "selected": false,
-          "text": "exchange-api-1",
-          "value": "exchange-api-1"
+          "text": "exchange-app1-1",
+          "value": "exchange-app1-1"
         },
         "error": null,
         "hide": 0,
@@ -593,18 +591,18 @@
         "options": [
           {
             "selected": true,
-            "text": "exchange-api-1",
-            "value": "exchange-api-1"
+            "text": "exchange-app1-1",
+            "value": "exchange-app1-1"
           },
           {
             "selected": false,
-            "text": "exchange-api-2",
-            "value": "exchange-api-2"
+            "text": "exchange-app2-1",
+            "value": "exchange-app2-1"
           },
           {
             "selected": false,
-            "text": "exchange-api-3",
-            "value": "exchange-api-3"
+            "text": "exchange-app3-1",
+            "value": "exchange-app3-1"
           },
           {
             "selected": false,
@@ -627,7 +625,7 @@
             "value": "exchange-nginx-1"
           }
         ],
-        "query": "exchange-api-1, exchange-api-2, exchange-api-3, exchange-cadvisor-1, exchange-grafana-1, exchange-graphite-1,  exchange-nginx-1, exchange_bbox_1",
+        "query": "exchange-app1-1, exchange-app2-1, exchange-app3-1, exchange-cadvisor-1, exchange-grafana-1, exchange-graphite-1, exchange-nginx-1",
         "queryValue": "",
         "skipUrlSync": false,
         "type": "custom"
@@ -635,7 +633,7 @@
     ]
   },
   "time": {
-    "from": "now-3m",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {
