@@ -1,0 +1,25 @@
+config:
+  environments:
+    api:
+      target: 'http://localhost:5555'
+      plugins:
+        statsd:
+          host: localhost
+          port: 8125
+          prefix: "artillery-api"
+  pool: 50
+  phases:
+    - name: Plain
+      duration: 60
+      arrivalRate: 2
+scenarios:
+  - name: Exchange ARS to USD
+    flow:
+      - post:
+          url: '/exchange'
+          json:
+            baseCurrency: "USD"
+            counterCurrency: "ARS"
+            baseAccountId: "a2"
+            counterAccountId: "a3"
+            baseAmount: 10

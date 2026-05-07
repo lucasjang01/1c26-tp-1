@@ -8,6 +8,8 @@ services:
       build: ./app
       environment:
           - REDIS_HOST=redis
+          - STATSD_HOST=graphite
+
       depends_on:
           - redis
       restart: unless-stopped
